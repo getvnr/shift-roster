@@ -1,18 +1,10 @@
-# Navigate to your project folder
-cd path/to/shift-roster
+import streamlit as st
+import pandas as pd
+import numpy as np
 
-# Initialize git
-git init
+st.title("12-Person Shift Roster")
 
-# Add files
-git add .
-
-# Commit changes
-git commit -m "Initial commit"
-
-# Link to GitHub repo
-git remote add origin https://github.com/yourusername/shift-roster.git
-
-# Push to GitHub
-git branch -M main
-git push -u origin main
+# Example DataFrame
+employees = ["Alice", "Bob", "Charlie"]
+roster = pd.DataFrame(index=employees, columns=[f"Day {i}" for i in range(1, 31)])
+st.dataframe(roster)
