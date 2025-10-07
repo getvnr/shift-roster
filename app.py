@@ -4,7 +4,7 @@ import numpy as np
 from calendar import monthrange, weekday
 
 st.set_page_config(layout="wide")
-st.title("Dynamic 24/7 Shift Roster with Working Days, Weekends, and Festivals")
+st.title("Structured 24/7 Shift Roster: 5-Day N, 5-Day F, Rest S")
 
 # --- Employee List ---
 employees = [
@@ -17,10 +17,6 @@ num_employees = len(employees)
 year = st.number_input("Select Year:", min_value=2023, max_value=2100, value=2025)
 month = st.selectbox("Select Month:", list(range(1,13)), format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
 num_days = monthrange(year, month)[1]
-
-# --- Input: Working Days per Employee ---
-working_days = st.number_input("Number of working days per employee:", min_value=1, max_value=num_days, value=21)
-off_days_per_employee = num_days - working_days
 
 # --- Festivals ---
 st.subheader("Select Festival Dates (Optional)")
@@ -47,61 +43,45 @@ def get_weekends(year, month):
 
 weekends = get_weekends(year, month)
 
-# --- Assign Off Days to Meet Working Days Requirement ---
-def assign_off_days(num_days, working_days):
-    total_off_days = num_days - working_days
-    off_days_positions = []
-    if total_off_days > 0:
-        interval = num_days // total_off_days
-        off_days_positions = [i for i in range(interval-1, num_days, interval)][:total_off_days]
-    return off_days_positions
-
-# --- Shift Assignment Function ---
-def assign_shifts(employees, num_days, working_days, weekends, festivals):
+# --- Assign 5-Day N and 5-Day F blocks for each employee ---
+def assign_structured_shifts(employees, num_days):
     roster_dict = {emp: ['']*num_days for emp in employees}
+    day_pointer = 0
 
-    # Pre-calculate off days per employee
-    emp_off_days = {emp: assign_off_days(num_days, working_days) for emp in employees}
+    # Create a repeating pattern for all employees: 5N → 5F → S for rest
+    for emp in employees:
+        pattern = ['N']*5 + ['F']*5
+        s_days = num_days - len(pattern)
+        pattern += ['S']*s_days
+        # Rotate pattern for fairness among employees
+        pattern = pattern[day_pointer:] + pattern[:day_pointer]
+        roster_dict[emp] = pattern
+        day_pointer = (day_pointer + 2) % num_days  # small rotation for fairness
+    return roster_dict
 
-    for day in range(1, num_days+1):
-        # Determine coverage for day
-        if day in weekends or day in festivals:
-            f_count, n_count = 3, 2
-        else:
-            f_count, n_count = 2, 2
-        s_count = num_employees - f_count - n_count
+# Generate base structured roster
+roster_dict = assign_structured_shifts(employees, num_days)
 
-        # Available employees (not off today)
-        available_emps = [emp for emp in employees if day-1 not in emp_off_days[emp]]
-
-        if len(available_emps) < f_count + n_count:
-            # If not enough employees, allow off employees to work to meet coverage
-            available_emps = employees.copy()
-
-        # Shuffle for fairness
+# --- Apply weekend/festival coverage adjustments ---
+for day in range(1, num_days+1):
+    if day in weekends or day in festival_days:
+        # Ensure F=3, N=2, rest S
+        f_count, n_count = 3, 2
+        # Shuffle employees
+        available_emps = employees.copy()
         np.random.shuffle(available_emps)
-
-        # Assign shifts
         f_emps = available_emps[:f_count]
         n_emps = available_emps[f_count:f_count+n_count]
         s_emps = [e for e in employees if e not in f_emps + n_emps]
-
         for emp in employees:
-            if day-1 in emp_off_days[emp]:
-                roster_dict[emp][day-1] = 'O'
-            elif emp in f_emps:
+            if emp in f_emps:
                 roster_dict[emp][day-1] = 'F'
             elif emp in n_emps:
                 roster_dict[emp][day-1] = 'N'
             else:
                 roster_dict[emp][day-1] = 'S'
 
-    return roster_dict
-
-# Generate roster
-roster_dict = assign_shifts(employees, num_days, working_days, weekends, festival_days)
-
-# Apply leaves
+# --- Apply Leaves ---
 for emp in employees:
     for leave_day in leave_data[emp]:
         roster_dict[emp][leave_day-1] = 'L'
@@ -125,9 +105,9 @@ def color_shifts(val):
         color = ''
     return f'background-color: {color}'
 
-st.subheader("Generated 24/7 Shift Roster")
+st.subheader("Generated 24/7 Structured Roster")
 st.dataframe(roster.style.applymap(color_shifts))
 
 # --- Download CSV ---
 csv = roster.to_csv().encode('utf-8')
-st.download_button("Download CSV", csv, "24_7_shift_roster.csv", "text/csv")
+st.download_button("Download CSV", csv, "structured_24_7_roster.csv", "text/csv")
