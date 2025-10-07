@@ -65,13 +65,13 @@ def assign_off_days(num_days, working_days, weekoff):
     return off_days_positions
 
 # --- Assign Structured Shifts ---
-def assign_shifts(employees, num_days, working_days, weekoff, weekends, festivals):
+def assign_shifts(employees, num_days, working_days, weekoff, weekends, festival_days):
     np.random.seed(42)  # For reproducibility
     roster_dict = {emp: ['S']*num_days for emp in employees}
     emp_off_days = {emp: assign_off_days(num_days, working_days, weekoff) for emp in employees}
     
     for day in range(num_days):
-        is_special_day = day+1 in weekends or day+1 in festivals
+        is_special_day = day+1 in weekends or day+1 in festival_days
         f_count, n_count = (3, 2) if is_special_day else (2, 2)
         
         available_emps = [emp for emp in employees if day not in emp_off_days[emp] and roster_dict[emp][day] != 'L']
@@ -106,7 +106,7 @@ roster = pd.DataFrame(roster_dict, index=dates).T
 for day in range(num_days):
     f_assigned = sum(1 for emp in employees if roster_dict[emp][day] == 'F')
     n_assigned = sum(1 for emp in employees if roster_dict[emp][day] == 'N')
-    min_f, min_n = (3, 2) if (day+1 in weekends or day+1 in festivals) else (2, 2)
+    min_f, min_n = (3, 2) if (day+1 in weekends or day+1 in festival_days) else (2, 2)
     if f_assigned < min_f or n_assigned < min_n:
         st.warning(f"Day {day+1} has insufficient coverage: {f_assigned}F, {n_assigned}N (required {min_f}F, {min_n}N).")
 
