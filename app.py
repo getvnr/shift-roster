@@ -9,23 +9,29 @@ st.title("Automated 24/7 Shift Roster Generator")
 # --- Employee Input ---
 st.subheader("Employee List")
 default_employees = [
-    "Ramesh Polisetty","Ajay Chidipotu","Srinivasu Cheedalla","Imran Khan",
-    "Sammeta Balachander","Muppa Divya","Anil Athkuri","Gangavarapu Suneetha",
-    "Gopalakrishnan Selvaraj","Paneerselvam F","Rajesh Jayapalan","Lakshmi Narayana Rao"
+    "Ramesh Polisetty", "Ajay Chidipotu", "Srinivasu Cheedalla", "Imran Khan",
+    "Sammeta Balachander", "Muppa Divya", "Anil Athkuri", "Gangavarapu Suneetha",
+    "Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan", "Lakshmi Narayana Rao"
 ]
 employees = st.text_area("Enter employee names (comma separated):", value=", ".join(default_employees))
-employees = [e.strip() for e in employees.split(",")]
+employees = [e.strip() for e in employees.split(",") if e.strip()]
+if not employees:
+    st.error("Please provide at least one employee name.")
+    st.stop()
 num_employees = len(employees)
 
 # --- Month & Year ---
 year = st.number_input("Select Year:", min_value=2023, max_value=2100, value=2025)
-month = st.selectbox("Select Month:", list(range(1,13)), format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
+month = st.selectbox("Select Month:", list(range(1, 13)), format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
 num_days = monthrange(year, month)[1]
 dates = [f"{day}-{month}-{year}" for day in range(1, num_days+1)]
 
 # --- Working Days & Week-Offs ---
 working_days_per_emp = st.number_input("Number of working days per employee:", min_value=1, max_value=num_days, value=21)
 weekoff_per_emp = st.number_input("Number of week-off days per employee:", min_value=0, max_value=num_days-working_days_per_emp, value=2)
+if working_days_per_emp + weekoff_per_emp > num_days:
+    st.error("Working days plus week-off days cannot exceed the number of days in the month.")
+    st.stop()
 
 # --- Festivals ---
 st.subheader("Select Festival Dates (Optional)")
@@ -35,8 +41,13 @@ festival_days = st.multiselect("Festival Days:", options=list(range(1, num_days+
 st.subheader("Add Employee Leaves or Special Codes")
 leave_data = {}
 for emp in employees:
-    leave_days = st.multiselect(f"{emp} Leaves/Special Codes (L/H/CO):", options=list(range(1, num_days+1)))
-    leave_data[emp] = leave_days
+    st.write(f"{emp} Leaves/Special Codes")
+    cols = st.columns(3)
+    with cols[0]:
+        leave_days = st.multiselect(f"Leave Days for {emp}:", options=list(range(1, num_days+1)), key=f"leave_{emp}")
+    with cols[1]:
+        codes = st.multiselect(f"Code for each day:", options=['L', 'H', 'CO'], key=f"code_{emp}")
+    leave_data[emp] = dict(zip(leave_days, codes[:len(leave_days)]))
 
 # --- Weekends ---
 def get_weekends(year, month):
@@ -55,41 +66,29 @@ def assign_off_days(num_days, working_days, weekoff):
 
 # --- Assign Structured Shifts ---
 def assign_shifts(employees, num_days, working_days, weekoff, weekends, festivals):
-    roster_dict = {emp: ['']*num_days for emp in employees}
+    np.random.seed(42)  # For reproducibility
+    roster_dict = {emp: ['S']*num_days for emp in employees}
     emp_off_days = {emp: assign_off_days(num_days, working_days, weekoff) for emp in employees}
-
-    # Assign 5N -> 5F -> S rotation with small rotation for fairness
-    day_pointer = 0
-    for emp in employees:
-        pattern = ['N']*5 + ['F']*5
-        s_days = num_days - len(pattern)
-        pattern += ['S']*s_days
-        pattern = pattern[day_pointer:] + pattern[:day_pointer]
-        roster_dict[emp] = pattern
-        day_pointer = (day_pointer + 2) % num_days
-
-    # Adjust weekends and festivals for minimum coverage
-    for day in range(1, num_days+1):
-        if day in weekends or day in festival_days:
-            f_count, n_count = 3, 2
-        else:
-            f_count, n_count = 2, 2
-        available_emps = [emp for emp in employees if day-1 not in emp_off_days[emp]]
+    
+    for day in range(num_days):
+        is_special_day = day+1 in weekends or day+1 in festivals
+        f_count, n_count = (3, 2) if is_special_day else (2, 2)
+        
+        available_emps = [emp for emp in employees if day not in emp_off_days[emp] and roster_dict[emp][day] != 'L']
         if len(available_emps) < f_count + n_count:
-            available_emps = employees.copy()  # allow off employees to work
+            st.warning(f"Insufficient employees for day {day+1}. Adjusting assignments.")
+            available_emps = [emp for emp in employees if roster_dict[emp][day] != 'L']
+        
         np.random.shuffle(available_emps)
-        f_emps = available_emps[:f_count]
-        n_emps = available_emps[f_count:f_count+n_count]
-        s_emps = [e for e in employees if e not in f_emps + n_emps]
+        for i, emp in enumerate(available_emps[:f_count]):
+            roster_dict[emp][day] = 'F'
+        for i, emp in enumerate(available_emps[f_count:f_count+n_count]):
+            roster_dict[emp][day] = 'N'
+        
         for emp in employees:
-            if day-1 in emp_off_days[emp]:
-                roster_dict[emp][day-1] = 'O'
-            elif emp in f_emps:
-                roster_dict[emp][day-1] = 'F'
-            elif emp in n_emps:
-                roster_dict[emp][day-1] = 'N'
-            else:
-                roster_dict[emp][day-1] = 'S'
+            if day in emp_off_days[emp]:
+                roster_dict[emp][day] = 'O'
+    
     return roster_dict
 
 # --- Generate Roster ---
@@ -97,30 +96,41 @@ roster_dict = assign_shifts(employees, num_days, working_days_per_emp, weekoff_p
 
 # --- Apply Leaves/Special Codes ---
 for emp in employees:
-    for leave_day in leave_data[emp]:
-        roster_dict[emp][leave_day-1] = 'L'
+    for day, code in leave_data[emp].items():
+        roster_dict[emp][day-1] = code
 
 # Convert to DataFrame
 roster = pd.DataFrame(roster_dict, index=dates).T
 
+# --- Check Minimum Coverage ---
+for day in range(num_days):
+    f_assigned = sum(1 for emp in employees if roster_dict[emp][day] == 'F')
+    n_assigned = sum(1 for emp in employees if roster_dict[emp][day] == 'N')
+    min_f, min_n = (3, 2) if (day+1 in weekends or day+1 in festivals) else (2, 2)
+    if f_assigned < min_f or n_assigned < min_n:
+        st.warning(f"Day {day+1} has insufficient coverage: {f_assigned}F, {n_assigned}N (required {min_f}F, {min_n}N).")
+
 # --- Color Coding ---
 def color_shifts(val):
-    if val == 'F':
-        color = 'green'
-    elif val == 'N':
-        color = 'blue'
-    elif val == 'S':
-        color = 'lightgreen'
-    elif val == 'O':
-        color = 'red'
-    elif val == 'L':
-        color = 'yellow'
-    else:
-        color = ''
-    return f'background-color: {color}'
+    colors = {'F': 'green', 'N': 'blue', 'S': 'lightgreen', 'O': 'red', 'L': 'yellow', 'H': 'orange', 'CO': 'purple'}
+    return f'background-color: {colors.get(val, "")}'
 
+# --- Display Roster ---
 st.subheader("Generated 24/7 Roster")
 st.dataframe(roster.style.applymap(color_shifts))
+
+# --- Shift Summary ---
+st.subheader("Shift Summary per Employee")
+summary = pd.DataFrame({
+    'F': [sum(1 for shift in roster_dict[emp] if shift == 'F') for emp in employees],
+    'N': [sum(1 for shift in roster_dict[emp] if shift == 'N') for emp in employees],
+    'S': [sum(1 for shift in roster_dict[emp] if shift == 'S') for emp in employees],
+    'O': [sum(1 for shift in roster_dict[emp] if shift == 'O') for emp in employees],
+    'L': [sum(1 for shift in roster_dict[emp] if shift == 'L') for emp in employees],
+    'H': [sum(1 for shift in roster_dict[emp] if shift == 'H') for emp in employees],
+    'CO': [sum(1 for shift in roster_dict[emp] if shift == 'CO') for emp in employees],
+}, index=employees)
+st.dataframe(summary)
 
 # --- Download CSV ---
 csv = roster.to_csv().encode('utf-8')
