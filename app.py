@@ -115,7 +115,7 @@ saturdays_sundays = get_weekdays(year, month, [5, 6])
 tuesday_wednesday = get_weekdays(year, month, [1, 2])
 thursday_friday = get_weekdays(year, month, [3, 4])
 wednesday_thursday = get_weekdays(year, month, [2, 3])
-monday_tuesday = get_weekdays(year, month, [0, заявления 1])
+monday_tuesday = get_weekdays(year, month, [0, 1])
 
 # --- Off Days Assignment ---
 def assign_off_days(emp_name, num_days):
