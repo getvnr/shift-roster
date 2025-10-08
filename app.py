@@ -5,7 +5,7 @@ from calendar import monthrange, weekday
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (5-day blocks)")
+st.title("Automated 24/7 Shift Roster Generator (Weekly blocks with opposite shifts)")
 
 # --- Default Employees and Shift Limits ---
 employee_data = pd.DataFrame([
@@ -39,9 +39,8 @@ employee_data = pd.DataFrame([
 
 employees = employee_data["Name"].tolist()
 
-# --- Fixed Roster for Non-Special Employees (Excluding Gopalakrishnan, Paneerselvam, Rajesh, Ajay, Imran, Sammeta) ---
+# --- Fixed Roster for Non-Special Employees (Excluding Group 1, Group 2, Ramesh) ---
 fixed_roster = {
-    "Ramesh Polisetty": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
     "Muppa Divya": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
     "Anil Athkuri": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
     "D Namithananda": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
@@ -134,7 +133,7 @@ def generate_roster():
     
     # Assign fixed shifts for non-special employees
     special_employees_1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
+    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander", "Ramesh Polisetty"]
     for emp in employees:
         if emp not in special_employees_1 and emp not in special_employees_2:
             for day in range(num_days):
@@ -152,9 +151,9 @@ def generate_roster():
                 if emp in shift_counts and roster[emp][day] in ['F', 'S', 'N']:
                     shift_counts[emp][roster[emp][day]] -= 1  # Adjust counts if overridden
 
-    # Assign shifts for Group 1 (Gopalakrishnan, Paneerselvam, Rajesh) - Opposite shifts
+    # Assign shifts for Group 1 (Gopalakrishnan, Paneerselvam, Rajesh) - 5-day opposite shifts
     shift_cycle_1 = ['F', 'S', 'N']
-    rotation_length = 5
+    rotation_length_1 = 5
     
     for day in range(num_days):
         day_num = day + 1
@@ -169,7 +168,7 @@ def generate_roster():
             continue
         
         # Assign shifts for Group 1
-        cycle_index = (day // rotation_length) % 3
+        cycle_index = (day // rotation_length_1) % 3
         shifts = [shift_cycle_1[cycle_index], shift_cycle_1[(cycle_index + 1) % 3], shift_cycle_1[(cycle_index + 2) % 3]]
         
         for i, emp in enumerate(special_employees_1):
@@ -182,30 +181,33 @@ def generate_roster():
                 roster[emp][day] = proposed_shift
                 shift_counts[emp][proposed_shift] += 1
 
-    # Assign shifts for Group 2 (Ajay, Imran, Sammeta) - Opposite shifts in 5-day blocks
-    shift_cycle_2 = ['N', 'F', 'S']  # Ajay=N, Imran=F, Sammeta=S
-    rotation_length = 5
-    for block in range(0, num_days, rotation_length):
-        # Determine shifts for the 5-day block
-        cycle_index = (block // rotation_length) % 3
+    # Assign shifts for Group 2 (Ajay, Imran, Sammeta, Ramesh) - Weekly opposite shifts
+    shift_cycle_2 = ['N', 'F', 'S', 'F']  # Ajay=N, Imran=F, Sammeta=S, Ramesh=F
+    rotation_length_2 = 7  # Weekly blocks (Mon-Sun)
+    for block in range(0, num_days, rotation_length_2):
+        # Determine shifts for the week
+        cycle_index = (block // rotation_length_2) % 3
         shifts = [
             shift_cycle_2[cycle_index],  # Ajay
             shift_cycle_2[(cycle_index + 1) % 3],  # Imran
-            shift_cycle_2[(cycle_index + 2) % 3]   # Sammeta
+            shift_cycle_2[(cycle_index + 2) % 3],  # Sammeta
+            shift_cycle_2[cycle_index] if shift_cycle_2[cycle_index] != shift_cycle_2[(cycle_index + 2) % 3] else 'F'  # Ramesh opposite to Ajay/Sammeta
         ]
-        # Adjust for Imran's nightshift exemption
-        if shifts[1] == 'N':
-            shifts[1], shifts[0] = shifts[0], shifts[1]
-            if shifts[1] == shifts[2]:
+        # Adjust for Imran's and Ramesh's nightshift exemption
+        if shifts[1] == 'N':  # Imran cannot take N
+            shifts[1], shifts[0] = shifts[0], shifts[1]  # Swap Imran and Ajay
+            if shifts[1] == shifts[2]:  # Ensure Sammeta's shift is different
                 shifts[2] = 'F' if shifts[1] == 'S' else 'S'
+            # Adjust Ramesh to be opposite to Ajay and Sammeta
+            shifts[3] = 'F' if shifts[0] != 'F' and shifts[2] != 'F' else 'S'
         
-        for day in range(block, min(block + rotation_length, num_days)):
+        for day in range(block, min(block + rotation_length_2, num_days)):
             day_num = day + 1
             if day_num in festival_set:
-                continue
+                continue  # Skip festival days
             
             # Assign week-offs for Group 2
-            off_idx = assign_off_days(special_employees_2[0], num_days)
+            off_idx = assign_off_days(special_employees_2[0], num_days)  # All four have same week-offs
             if day in off_idx:
                 for emp in special_employees_2:
                     roster[emp][day] = 'O'
@@ -222,6 +224,7 @@ def generate_roster():
                     roster[emp][day] = proposed_shift
                     shift_counts[emp][proposed_shift] += 1
                 else:
+                    # Try alternative shift if limit reached
                     available_shifts = ['F', 'S', 'N'] if emp not in nightshift_exempt else ['F', 'S']
                     for alt_shift in available_shifts:
                         if alt_shift != proposed_shift and alt_shift not in [roster[e][day] for e in special_employees_2 if e != emp and roster[e][day] in ['F', 'S', 'N']]:
