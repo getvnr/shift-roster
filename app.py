@@ -40,17 +40,23 @@ employee_data = pd.DataFrame([
 employees = employee_data["Name"].tolist()
 
 # --- Nightshift Exempt ---
-nightshift_exempt = st.multiselect("Nightshift-Exempt Employees", employees, default=["Ramesh Polisetty", "Srinivasu Cheedalla"])
+nightshift_exempt = st.multiselect("Nightshift-Exempt Employees", employees, default=["Ramesh Polisetty", "Srinivasu Cheedalla", "Imran Khan"])
 
 # --- Weekoff Preferences ---
 st.subheader("Weekoff Preferences")
+# Default Tuesday-Wednesday for most employees
+default_tue_wed = [
+    "Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan", "Ajay Chidipotu",
+    "Imran Khan", "Sammeta Balachander", "Ramesh Polisetty", "Muppa Divya", "Anil Athkuri",
+    "D Namithananda", "Srinivasu Cheedalla", "Gangavarapu Suneetha"
+]
 friday_saturday_off = st.multiselect("Friday-Saturday Off", employees, default=[])
 sunday_monday_off = st.multiselect("Sunday-Monday Off", employees, default=[])
 saturday_sunday_off = st.multiselect("Saturday-Sunday Off", employees, default=[])
-tuesday_wednesday_off = st.multiselect("Tuesday-Wednesday Off", employees, default=[])
+tuesday_wednesday_off = st.multiselect("Tuesday-Wednesday Off", employees, default=default_tue_wed)
 thursday_friday_off = st.multiselect("Thursday-Friday Off", employees, default=[])
-wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, default=[])
-monday_tuesday_off = st.multiselect("Monday-Tuesday Off", employees, default=[])
+wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, default=["Lakshmi Narayana Rao"])
+monday_tuesday_off = st.multiselect("Monday-Tuesday Off", employees, default=["Abdul Mukthiyar Basha", "B Madhurusha", "Chinthalapudi Yaswanth", "Edagotti Kalpana"])
 
 # --- Validate Overlaps ---
 groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off, 
@@ -77,13 +83,13 @@ def get_weekdays(year, month, weekday_indices):
     return [d for d in range(1, monthrange(year, month)[1] + 1) if weekday(year, month, d) in weekday_indices]
 
 # Calculate weekdays for week-off preferences
-fridays_saturdays = get_weekdays(year, month, [4, 5])  # Friday=4, Saturday=5
-sundays_mondays = get_weekdays(year, month, [6, 0])    # Sunday=6, Monday=0
-saturdays_sundays = get_weekdays(year, month, [5, 6])  # Saturday=5, Sunday=6
-tuesday_wednesday = get_weekdays(year, month, [1, 2])  # Tuesday=1, Wednesday=2
-thursday_friday = get_weekdays(year, month, [3, 4])    # Thursday=3, Friday=4
-wednesday_thursday = get_weekdays(year, month, [2, 3]) # Wednesday=2, Thursday=3
-monday_tuesday = get_weekdays(year, month, [0, 1])     # Monday=0, Tuesday=1
+fridays_saturdays = get_weekdays(year, month, [4, 5])
+sundays_mondays = get_weekdays(year, month, [6, 0])
+saturdays_sundays = get_weekdays(year, month, [5, 6])
+tuesday_wednesday = get_weekdays(year, month, [1, 2])
+thursday_friday = get_weekdays(year, month, [3, 4])
+wednesday_thursday = get_weekdays(year, month, [2, 3])
+monday_tuesday = get_weekdays(year, month, [0, 1])
 
 # --- Off Days Assignment ---
 def assign_off_days(emp_name, num_days):
@@ -101,7 +107,7 @@ def assign_off_days(emp_name, num_days):
 def generate_roster():
     np.random.seed(42)
     roster = {emp: [''] * num_days for emp in employees}
-    shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}  # Track shift counts
+    shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}
     
     # Assign Offs
     for emp in employees:
@@ -113,10 +119,10 @@ def generate_roster():
     
     # Define shift rotation for Gopalakrishnan, Paneerselvam, and Rajesh
     special_employees = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-    shift_cycle = ['F', 'S', 'N']  # 5-day rotation: F -> S -> N
+    shift_cycle = ['F', 'S', 'N']
     rotation_length = 5
     
-    # Assign shifts for special employees first
+    # Assign shifts for special employees
     for day in range(num_days):
         day_num = day + 1
         if day_num in festival_set:
@@ -129,12 +135,11 @@ def generate_roster():
         shifts = [shift_cycle[cycle_index], shift_cycle[(cycle_index + 1) % 3], shift_cycle[(cycle_index + 2) % 3]]
         
         for i, emp in enumerate(special_employees):
-            if roster[emp][day] == 'O':  # Respect week-offs
+            if roster[emp][day] == 'O':
                 continue
             proposed_shift = shifts[i]
-            if emp in nightshift_exempt and proposed_shift == 'N':  # Skip night shift if exempt
+            if emp in nightshift_exempt and proposed_shift == 'N':
                 continue
-            # Check shift limits
             if shift_counts[emp][proposed_shift] < employee_data.loc[employee_data['Name'] == emp, f"{proposed_shift}_max"].values[0]:
                 roster[emp][day] = proposed_shift
                 shift_counts[emp][proposed_shift] += 1
@@ -166,22 +171,22 @@ def generate_roster():
         if len(available) < (F_req + S_req + N_req):
             st.warning(f"Insufficient employees available on day {day_num} to meet shift requirements. Needed: {F_req}F, {S_req}S, {N_req}N. Available: {len(available)}")
         
-        # Assign Night shifts
+        # Assign Night shifts (prioritize Ajay Chidipotu, Sammeta Balachander)
         n_candidates = [e for e in available if e not in nightshift_exempt]
         n_candidates = [e for e in n_candidates if shift_counts[e]['N'] < employee_data.loc[employee_data['Name'] == e, 'N_max'].values[0]]
-        n_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'N_max'].values[0], reverse=True)
+        n_candidates.sort(key=lambda x: (x in ['Ajay Chidipotu', 'Sammeta Balachander'], employee_data.loc[employee_data['Name'] == x, 'N_max'].values[0]), reverse=True)
         n_assigned = 0
         for emp in n_candidates:
             if n_assigned >= N_req: break
-            if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
+            if day >= 3 and all(roster[emp][day - 3 + p] == 'N' for p in range(3)): continue
             roster[emp][day] = 'N'
             shift_counts[emp]['N'] += 1
             n_assigned += 1
             available.remove(emp)
         
-        # Assign First Shift
+        # Assign First Shift (prioritize Imran Khan, Sammeta Balachander, Ramesh Polisetty, etc.)
         f_candidates = [e for e in available if shift_counts[e]['F'] < employee_data.loc[employee_data['Name'] == e, 'F_max'].values[0]]
-        f_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'F_max'].values[0], reverse=True)
+        f_candidates.sort(key=lambda x: (x in ['Imran Khan', 'Sammeta Balachander', 'Ramesh Polisetty', 'Muppa Divya', 'Srivastav Nitin', 'Kishore Khati Vaibhav', 'Rupan Venkatesan Anandha'], employee_data.loc[employee_data['Name'] == x, 'F_max'].values[0]), reverse=True)
         f_assigned = 0
         for emp in f_candidates:
             if f_assigned >= F_req: break
@@ -190,8 +195,9 @@ def generate_roster():
             f_assigned += 1
             available.remove(emp)
         
-        # Assign Second Shift
+        # Assign Second Shift (prioritize Anil Athkuri, D Namithananda, Srinivasu Cheedalla, etc.)
         s_candidates = [e for e in available if shift_counts[e]['S'] < employee_data.loc[employee_data['Name'] == e, 'S_max'].values[0]]
+        s_candidates.sort(key=lambda x: (x in ['Anil Athkuri', 'D Namithananda', 'Srinivasu Cheedalla', 'Gangavarapu Suneetha', 'Chaudhari Kaustubh', 'Shejal Gawade', 'Vivek Kushwaha', 'M Naveen'], employee_data.loc[employee_data['Name'] == x, 'S_max'].values[0]), reverse=True)
         for emp in s_candidates:
             if S_req <= 0: break
             roster[emp][day] = 'S'
