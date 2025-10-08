@@ -7,23 +7,39 @@ from git import Repo
 st.title("Automatic Employee Roster")
 
 # ---------------------------
-# Step 1: Load employee data
+# Step 1: Employee Data (embedded)
 # ---------------------------
-try:
-    employees = pd.read_csv("employees.csv", encoding='utf-8-sig')  # Handles BOM
-except UnicodeDecodeError:
-    employees = pd.read_csv("employees.csv", encoding='latin1')
+data = [
+    ["Ramesh Polisetty","","L2","S","Yes",0],
+    ["Ajay Chidipotu","Websphere","L2","F,S,N","Yes",10],
+    ["Srinivasu Cheedalla","","L2","E","Yes",0],
+    ["Imran Khan","Websphere","L2","F,S","Yes",0],
+    ["Sammeta Balachander","Websphere","L2","F,S,N","Yes",10],
+    ["Muppa Divya","","L2","S","Yes",0],
+    ["Anil Athkuri","","L2","S","Yes",0],
+    ["Gangavarapu Suneetha","","L2","G","Yes",0],
+    ["Gopalakrishnan Selvaraj","IIS","L2","F,S,N","Yes",10],
+    ["Paneerselvam","IIS","L2","F,S,N","Yes",10],
+    ["Rajesh Jayapalan","IIS","L2","F,S,N","Yes",10],
+    ["Lakshmi Narayana Rao","","L2","G","Yes",0],
+    ["Pousali C","","L1","F,S,N","Yes",10],
+    ["D Namithananda","","L2","S","No",0],
+    ["Thorat Yashwant","","L1","F,S,N","Yes",10],
+    ["Srivastav Nitin","","L1","F,S,N","No",10],
+    ["Kishore Khati Vaibhav","","L1","F,S,N","No",10],
+    ["Rupan Venkatesan Anandha","","L1","F,S,N","No",10],
+    ["Chaudhari Kaustubh","","L1","F,S,N","No",10],
+    ["Shejal Gawade","","L1","F,S,N","No",10],
+    ["Vivek Kushwaha","","L1","F,S,N","No",10],
+    ["Abdul Mukthiyar Basha","","L1","F,S,N","No",10],
+    ["M Naveen","","L1","F,S,N","No",10],
+    ["B Madhurusha","","L1","F,S,N","No",10],
+    ["Chinthalapudi Yaswanth","","L1","F,S,N","No",10],
+    ["Edagotti Kalpana","","L1","F,S,N","No",10]
+]
 
-# Clean column names (remove spaces and special characters)
-employees.columns = employees.columns.str.strip()
-
-# Display columns for debugging
-st.write("Detected columns:", employees.columns.tolist())
-
-# Check if 'Name' column exists
-if 'Name' not in employees.columns:
-    st.error("CSV must have a 'Name' column")
-    st.stop()
+columns = ["Name","AlwaysOppositeShifts","Skill","ShiftsAllowed","WeekendOff","MaxNightShifts"]
+employees = pd.DataFrame(data, columns=columns)
 
 # ---------------------------
 # Step 2: Initialize roster
