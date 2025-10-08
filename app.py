@@ -6,7 +6,7 @@ import uuid
 
 # Set page configuration
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (13 Employees, Specific Shift Counts)")
+st.title("Automated 24/7 Shift Roster Generator (13 Employees, Continuous Shift Blocks)")
 
 # --- Employee Input ---
 st.subheader("Employee List")
@@ -183,37 +183,82 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 roster_dict[emp][day-1] = code
                 shift_counts[emp][code] += 1
     
-    # Assign F and N shifts to meet exact targets
+    # Assign F and N shifts in blocks of 4 or 5
     for emp in employees:
-        available_days = [d for d in range(num_days) if roster_dict[emp][d] == '' and d+1 not in festival_days]
-        np.random.shuffle(available_days)
+        available_days = sorted([d for d in range(num_days) if roster_dict[emp][d] == '' and d+1 not in festival_days])
+        if not available_days:
+            continue
         
-        # Assign 5 F shifts
-        f_days = []
-        for day in available_days:
-            if shift_counts[emp]['F'] < target_f:
+        # Assign F shifts (5 in one block)
+        if shift_counts[emp]['F'] < target_f:
+            block_size = 5  # Use 5 for F to meet exact count
+            start_idx = np.random.randint(0, max(1, len(available_days) - block_size + 1))
+            f_days = []
+            for i in range(start_idx, min(start_idx + block_size, len(available_days))):
+                day = available_days[i]
                 f_count_day = sum(1 for e in employees if roster_dict[e][day] == 'F')
-                if f_count_day < 5:  # Allow up to 5 F per day to ensure coverage
+                if f_count_day < 5 and shift_counts[emp]['F'] < target_f:  # Allow up to 5 F per day
                     roster_dict[emp][day] = 'F'
                     shift_counts[emp]['F'] += 1
                     f_days.append(day)
-        available_days = [d for d in available_days if d not in f_days]
+            available_days = [d for d in available_days if d not in f_days]
         
-        # Assign 5 N shifts
-        if emp not in nightshift_exempt:
+        # Assign N shifts (5 in one block)
+        if emp not in nightshift_exempt and shift_counts[emp]['N'] < target_n:
+            block_size = 5  # Use 5 for N to meet exact count
+            start_idx = np.random.randint(0, max(1, len(available_days) - block_size + 1))
             n_days = []
-            for day in available_days:
-                if shift_counts[emp]['N'] < target_n:
-                    if day >= 5 and all(roster_dict[emp][d] == 'N' for d in range(day-5, day)):
-                        continue
-                    n_count_day = sum(1 for e in employees if roster_dict[e][day] == 'N')
-                    if n_count_day < 3:  # Allow up to 3 N per day
-                        roster_dict[emp][day] = 'N'
-                        shift_counts[emp]['N'] += 1
-                        n_days.append(day)
+            for i in range(start_idx, min(start_idx + block_size, len(available_days))):
+                day = available_days[i]
+                if day >= 5 and all(roster_dict[emp][d] == 'N' for d in range(day-5, day)):
+                    continue
+                n_count_day = sum(1 for e in employees if roster_dict[e][day] == 'N')
+                if n_count_day < 3 and shift_counts[emp]['N'] < target_n:  # Allow up to 3 N per day
+                    roster_dict[emp][day] = 'N'
+                    shift_counts[emp]['N'] += 1
+                    n_days.append(day)
             available_days = [d for d in available_days if d not in n_days]
     
-    # Assign remaining shifts
+    # Assign S shifts in blocks
+    for emp in employees:
+        available_days = sorted([d for d in range(num_days) if roster_dict[emp][d] == '' and d+1 not in festival_days])
+        if not available_days:
+            continue
+        
+        s_needed = max(target_s_min - shift_counts[emp]['S'], 0)
+        s_possible = min(target_s_max - shift_counts[emp]['S'], len(available_days))
+        s_to_assign = min(s_possible, max(s_needed, len(available_days)))
+        
+        while s_to_assign > 0 and available_days:
+            block_size = np.random.choice([4, 5], p=[0.5, 0.5])
+            block_size = min(block_size, s_to_assign, len(available_days))
+            start_idx = 0
+            if len(available_days) > block_size:
+                start_idx = np.random.randint(0, len(available_days) - block_size + 1)
+            
+            consecutive_days = []
+            for i in range(start_idx, len(available_days)):
+                day = available_days[i]
+                if not consecutive_days or day == consecutive_days[-1] + 1:
+                    consecutive_days.append(day)
+                    if len(consecutive_days) == block_size:
+                        break
+                else:
+                    consecutive_days = [day]
+            
+            if len(consecutive_days) < block_size:
+                consecutive_days = available_days[start_idx:start_idx + block_size]
+            
+            for day in consecutive_days:
+                if shift_counts[emp]['S'] < target_s_max:
+                    s_count_day = sum(1 for e in employees if roster_dict[e][day] == 'S')
+                    if s_count_day < 5:  # Allow up to 5 S per day
+                        roster_dict[emp][day] = 'S'
+                        shift_counts[emp]['S'] += 1
+                        s_to_assign -= 1
+            available_days = [d for d in available_days if d not in consecutive_days]
+    
+    # Ensure daily coverage
     for day in range(num_days):
         day_num = day + 1
         if day_num in festival_days:
@@ -227,10 +272,13 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
         min_n = 2
         min_s = 3
         
+        f_count = sum(1 for emp in employees if roster_dict[emp][day] == 'F')
+        n_count = sum(1 for emp in employees if roster_dict[emp][day] == 'N')
+        s_count = sum(1 for emp in employees if roster_dict[emp][day] == 'S')
+        
         available_emps = [emp for emp in employees if roster_dict[emp][day] == '']
         
-        # Ensure minimum F shifts
-        f_count = sum(1 for emp in employees if roster_dict[emp][day] == 'F')
+        # Fix F shortages
         available_emps.sort(key=lambda emp: (shift_counts[emp]['F'], np.random.random()))
         for emp in available_emps:
             if f_count < min_f and shift_counts[emp]['F'] <= target_f:
@@ -240,10 +288,9 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 if emp in available_emps:
                     available_emps.remove(emp)
         
-        # Ensure minimum N shifts
+        # Fix N shortages
         non_exempt_available = [emp for emp in available_emps if emp not in nightshift_exempt]
         non_exempt_available.sort(key=lambda emp: (shift_counts[emp]['N'], np.random.random()))
-        n_count = sum(1 for emp in employees if roster_dict[emp][day] == 'N')
         for emp in non_exempt_available:
             if n_count < min_n and shift_counts[emp]['N'] <= target_n:
                 if day >= 5 and all(roster_dict[emp][d] == 'N' for d in range(day-5, day)):
@@ -254,9 +301,8 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 if emp in available_emps:
                     available_emps.remove(emp)
         
-        # Assign S shifts
+        # Fix S shortages
         available_emps.sort(key=lambda emp: (shift_counts[emp]['S'], np.random.random()))
-        s_count = sum(1 for emp in employees if roster_dict[emp][day] == 'S')
         for emp in available_emps:
             if s_count < min_s and shift_counts[emp]['S'] < target_s_max:
                 roster_dict[emp][day] = 'S'
@@ -324,7 +370,7 @@ if coverage_issues or shift_count_issues or night_shift_issues:
     if night_shift_issues:
         st.warning("Night Shift Issues:\n" + "\n".join(night_shift_issues))
 else:
-    st.success("✅ Full 24/7 coverage achieved with target shift counts!")
+    st.success("✅ Full 24/7 coverage achieved with target shift counts and continuous blocks!")
 
 # --- Color Coding ---
 def color_shifts(val):
