@@ -47,10 +47,15 @@ st.subheader("Weekoff Preferences")
 friday_saturday_off = st.multiselect("Friday-Saturday Off", employees, default=[])
 sunday_monday_off = st.multiselect("Sunday-Monday Off", employees, default=[])
 saturday_sunday_off = st.multiselect("Saturday-Sunday Off", employees, default=[])
+tuesday_wednesday_off = st.multiselect("Tuesday-Wednesday Off", employees, default=[])
+thursday_friday_off = st.multiselect("Thursday-Friday Off", employees, default=[])
+wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, default=[])
+monday_tuesday_off = st.multiselect("Monday-Tuesday Off", employees, default=[])
 
 # --- Validate Overlaps ---
-groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off]
-names = ["Fri-Sat", "Sun-Mon", "Sat-Sun"]
+groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off, 
+          tuesday_wednesday_off, thursday_friday_off, wednesday_thursday_off, monday_tuesday_off]
+names = ["Fri-Sat", "Sun-Mon", "Sat-Sun", "Tue-Wed", "Thu-Fri", "Wed-Thu", "Mon-Tue"]
 for i in range(len(groups)):
     for j in range(i + 1, len(groups)):
         overlap = set(groups[i]) & set(groups[j])
@@ -71,9 +76,14 @@ festival_days = st.multiselect("Festival Days", list(range(1, num_days + 1)), de
 def get_weekdays(year, month, weekday_indices):
     return [d for d in range(1, monthrange(year, month)[1] + 1) if weekday(year, month, d) in weekday_indices]
 
-fridays_saturdays = get_weekdays(year, month, [4, 5])
-sundays_mondays = get_weekdays(year, month, [6, 0])
-saturdays_sundays = get_weekdays(year, month, [5, 6])
+# Calculate weekdays for week-off preferences
+fridays_saturdays = get_weekdays(year, month, [4, 5])  # Friday=4, Saturday=5
+sundays_mondays = get_weekdays(year, month, [6, 0])    # Sunday=6, Monday=0
+saturdays_sundays = get_weekdays(year, month, [5, 6])  # Saturday=5, Sunday=6
+tuesday_wednesday = get_weekdays(year, month, [1, 2])  # Tuesday=1, Wednesday=2
+thursday_friday = get_weekdays(year, month, [3, 4])    # Thursday=3, Friday=4
+wednesday_thursday = get_weekdays(year, month, [2, 3]) # Wednesday=2, Thursday=3
+monday_tuesday = get_weekdays(year, month, [0, 1])     # Monday=0, Tuesday=1
 
 # --- Off Days Assignment ---
 def assign_off_days(emp_name, num_days):
@@ -81,6 +91,10 @@ def assign_off_days(emp_name, num_days):
     if emp_name in friday_saturday_off: off_days += fridays_saturdays
     if emp_name in sunday_monday_off: off_days += sundays_mondays
     if emp_name in saturday_sunday_off: off_days += saturdays_sundays
+    if emp_name in tuesday_wednesday_off: off_days += tuesday_wednesday
+    if emp_name in thursday_friday_off: off_days += thursday_friday
+    if emp_name in wednesday_thursday_off: off_days += wednesday_thursday
+    if emp_name in monday_tuesday_off: off_days += monday_tuesday
     return set([d - 1 for d in off_days if d <= num_days])
 
 # --- Generate Roster ---
