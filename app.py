@@ -140,7 +140,8 @@ def generate_roster():
     for emp in employees:
         if emp not in special_employees:
             for day in range(num_days):
-                if emp in fixed_roster and fixed_roster[emp][day] in ['F', 'S', 'N', 'O']:
+                # Check if day is within fixed_roster length
+                if emp in fixed_roster and day < len(fixed_roster[emp]) and fixed_roster[emp][day] in ['F', 'S', 'N', 'O']:
                     roster[emp][day] = fixed_roster[emp][day]
                     if roster[emp][day] in ['F', 'S', 'N']:
                         shift_counts[emp][roster[emp][day]] += 1
