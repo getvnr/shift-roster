@@ -6,7 +6,7 @@ import uuid
 
 # Set page configuration
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (13 Employees, Balanced Shifts)")
+st.title("Automated 24/7 Shift Roster Generator (13 Employees, Full Coverage)")
 
 # --- Employee Input ---
 st.subheader("Employee List")
@@ -77,7 +77,7 @@ num_days = monthrange(year, month)[1]
 dates = [f"{day:02d}-{month:02d}-{year}" for day in range(1, num_days+1)]
 
 # --- Working Days ---
-working_days_per_emp = st.number_input("Number of working days per employee:", min_value=1, max_value=num_days, value=21)
+working_days_per_emp = st.number_input("Number of working days per employee:", min_value=1, max_value=num_days, value=22)
 total_off_days = num_days - working_days_per_emp
 if total_off_days < 0:
     st.error("Working days cannot exceed the number of days in the month.")
@@ -118,6 +118,7 @@ def assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, 
     total_off = num_days - working_days
     off_days_positions = []
     
+    # Assign preferred week-offs
     if is_friday_saturday:
         off_days_positions.extend([d-1 for d in fridays_saturdays])
     elif is_sunday_monday:
@@ -127,18 +128,12 @@ def assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, 
     
     remaining_off = total_off - len(off_days_positions)
     if remaining_off < 0:
-        return off_days_positions
+        return off_days_positions[:total_off]
     
-    cycle_length = 7  # 5 working + 2 off
-    num_cycles = remaining_off // 2
-    for cycle in range(num_cycles):
-        start = cycle * cycle_length + 5
-        if start + 1 < num_days:
-            off_days_positions.extend([start, start + 1])
-    
-    if remaining_off % 2 == 1 and len(off_days_positions) + 1 < num_days:
-        last_off = min(num_days - 1, off_days_positions[-1] + cycle_length + 1 if off_days_positions else 5)
-        off_days_positions.append(last_off)
+    # Distribute remaining off days to avoid clustering
+    available_days = [d for d in range(num_days) if d not in off_days_positions]
+    if remaining_off > 0:
+        off_days_positions.extend(np.random.choice(available_days, size=remaining_off, replace=False))
     
     return sorted(set(off_days_positions))
 
@@ -147,16 +142,37 @@ def assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, 
 def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, saturday_sunday_off, leave_data):
     np.random.seed(42)
     roster_dict = {emp: [''] * num_days for emp in employees}
-    shift_counts = {emp: {'F': 0, 'G1': 0, 'N': 0, 'S': 0, 'O': 0, 'L': 0, 'H': 0, 'CO': 0} for emp in employees}
+    shift_counts = {emp: {'F': 0, 'N': 0, 'S': 0, 'O': 0, 'L': 0, 'H': 0, 'CO': 0} for emp in employees}
     
-    # Pre-assign off days
+    # Pre-assign off days, ensuring enough employees are available
     emp_off_days = {}
-    g1_employees = []  # No G1-eligible employees in this subset
     for emp in employees:
         is_friday_saturday = emp in friday_saturday_off
         is_sunday_monday = emp in sunday_monday_off
         is_saturday_sunday = emp in saturday_sunday_off
         emp_off_days[emp] = assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday)
+    
+    # Check if off days allow enough employees per day
+    for day in range(num_days):
+        if day + 1 in festival_days:
+            continue
+        available_count = sum(1 for emp in employees if day not in emp_off_days[emp] and (day+1 not in leave_data.get(emp, {})))
+        if available_count < 8:
+            # Redistribute off days
+            excess_offs = 8 - available_count
+            off_employees = [emp for emp in employees if day in emp_off_days[emp]]
+            np.random.shuffle(off_employees)
+            for emp in off_employees[:excess_offs]:
+                emp_off_days[emp].remove(day)
+                # Reassign off day to another day
+                available_days = [d for d in range(num_days) if d not in emp_off_days[emp] and d+1 not in festival_days and d+1 not in leave_data.get(emp, {})]
+                if available_days:
+                    new_off = np.random.choice(available_days)
+                    emp_off_days[emp].append(new_off)
+                    emp_off_days[emp] = sorted(set(emp_off_days[emp]))
+    
+    # Apply off days
+    for emp in employees:
         for day in emp_off_days[emp]:
             roster_dict[emp][day] = 'O'
             shift_counts[emp]['O'] += 1
@@ -171,17 +187,16 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
     # Assign shifts for each day
     for day in range(num_days):
         day_num = day + 1
-        is_festival = day_num in festival_days
-        if is_festival:
+        if day_num in festival_days:
             for emp in employees:
                 roster_dict[emp][day] = 'H'
                 shift_counts[emp]['H'] += 1
             continue
         
         # Minimum shift requirements
-        min_fg1 = 3  # Morning (F only, since no G1 employees)
-        min_n = 2    # Night
-        min_s = 3    # Second
+        min_f = 3  # Morning (F only, no G1 employees)
+        min_n = 2  # Night
+        min_s = 3  # Second
         
         # Available employees
         available_emps = [emp for emp in employees if roster_dict[emp][day] == '']
@@ -200,15 +215,39 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 n_count += 1
                 available_emps.remove(emp)
         
+        # If night shifts are short, reassign from S or F
+        if n_count < min_n:
+            reassign_emps = [emp for emp in employees if roster_dict[emp][day] == 'S' and emp not in nightshift_exempt]
+            reassign_emps.sort(key=lambda emp: (shift_counts[emp]['N'], np.random.random()))
+            for emp in reassign_emps:
+                if n_count < min_n:
+                    if day >= 5 and all(roster_dict[emp][d] == 'N' for d in range(day-5, day)):
+                        continue
+                    roster_dict[emp][day] = 'N'
+                    shift_counts[emp]['N'] += 1
+                    shift_counts[emp]['S'] -= 1
+                    n_count += 1
+        
         # Assign Morning shifts (F)
         available_emps.sort(key=lambda emp: (shift_counts[emp]['F'], np.random.random()))
         f_count = 0
         for emp in available_emps:
-            if f_count < min_fg1:
+            if f_count < min_f:
                 roster_dict[emp][day] = 'F'
                 shift_counts[emp]['F'] += 1
                 f_count += 1
                 available_emps.remove(emp)
+        
+        # If morning shifts are short, reassign from S
+        if f_count < min_f:
+            reassign_emps = [emp for emp in employees if roster_dict[emp][day] == 'S']
+            reassign_emps.sort(key=lambda emp: (shift_counts[emp]['F'], np.random.random()))
+            for emp in reassign_emps:
+                if f_count < min_f:
+                    roster_dict[emp][day] = 'F'
+                    shift_counts[emp]['F'] += 1
+                    shift_counts[emp]['S'] -= 1
+                    f_count += 1
         
         # Assign Second shifts (S)
         available_emps.sort(key=lambda emp: (shift_counts[emp]['S'], np.random.random()))
@@ -236,16 +275,15 @@ coverage_issues = []
 for day in range(num_days):
     day_num = day + 1
     f_count = sum(1 for emp in employees if roster_dict[emp][day] == 'F')
-    g1_count = sum(1 for emp in employees if roster_dict[emp][day] == 'G1')
     n_count = sum(1 for emp in employees if roster_dict[emp][day] == 'N')
     s_count = sum(1 for emp in employees if roster_dict[emp][day] == 'S')
     is_festival = day_num in festival_days
-    min_fg1 = 0 if is_festival else 3
+    min_f = 0 if is_festival else 3
     min_n = 0 if is_festival else 2
     min_s = 0 if is_festival else 3
     
-    if f_count + g1_count < min_fg1 or n_count < min_n or s_count < min_s:
-        coverage_issues.append(f"⚠️ Day {day_num}: {f_count + g1_count} F/G1, {n_count} N, {s_count} S (need {min_fg1} F/G1, {min_n} N, {min_s} S)")
+    if f_count < min_f or n_count < min_n or s_count < min_s:
+        coverage_issues.append(f"⚠️ Day {day_num}: {f_count} F, {n_count} N, {s_count} S (need {min_f} F, {min_n} N, {min_s} S)")
 
 # Validate maximum 5 consecutive night shifts
 night_shift_issues = []
@@ -273,7 +311,7 @@ else:
 
 # --- Color Coding ---
 def color_shifts(val):
-    colors = {'G1': 'limegreen', 'F': 'green', 'N': 'blue', 'S': 'lightgreen', 'O': 'red', 'L': 'yellow', 'H': 'orange', 'CO': 'purple'}
+    colors = {'F': 'green', 'N': 'blue', 'S': 'lightgreen', 'O': 'red', 'L': 'yellow', 'H': 'orange', 'CO': 'purple'}
     return f'background-color: {colors.get(val, "")}'
 
 # --- Display Roster ---
@@ -283,7 +321,7 @@ st.dataframe(roster.style.applymap(color_shifts), height=600)
 
 # --- Shift Summary ---
 st.subheader("Shift Summary")
-summary_data = {shift: [sum(1 for s in roster_dict[emp] if s == shift) for emp in employees] for shift in ['G1', 'F', 'N', 'S', 'O', 'L', 'H', 'CO']}
+summary_data = {shift: [sum(1 for s in roster_dict[emp] if s == shift) for emp in employees] for shift in ['F', 'N', 'S', 'O', 'L', 'H', 'CO']}
 summary = pd.DataFrame(summary_data, index=employees)
 st.dataframe(summary)
 
