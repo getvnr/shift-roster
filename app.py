@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from calendar import monthrange, weekday
-import math
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
@@ -34,19 +33,22 @@ nightshift_exempt = st.multiselect(
 
 # --- Weekoff Preferences ---
 st.subheader("Weekoff Preferences")
-friday_saturday_off = st.multiselect("Friday-Saturday Off", employees, default=["Gangavarapu Suneetha","Lakshmi Narayana Rao"])
-sunday_monday_off = st.multiselect("Sunday-Monday Off", employees, default=["Ajay Chidipotu","Imran Khan"])
-saturday_sunday_off = st.multiselect("Saturday-Sunday Off", employees, default=["Muppa Divya","Anil Athkuri"])
+weekoff_options = {
+    "Fri-Sat": [4,5],
+    "Sat-Sun": [5,6],
+    "Sun-Mon": [6,0],
+    "Tue-Wed": [1,2],
+    "Thu-Fri": [3,4]
+}
 
-# --- Validate Overlaps ---
-groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off]
-names = ["Fri-Sat","Sun-Mon","Sat-Sun"]
-for i in range(len(groups)):
-    for j in range(i+1, len(groups)):
-        overlap = set(groups[i]) & set(groups[j])
-        if overlap:
-            st.error(f"Employees in both {names[i]} & {names[j]}: {', '.join(overlap)}")
+employee_weekoff = {}
+for key in weekoff_options:
+    selected = st.multiselect(f"{key} Off", employees)
+    for emp in selected:
+        if emp in employee_weekoff:
+            st.error(f"{emp} selected for multiple week-off patterns! Please assign only one.")
             st.stop()
+        employee_weekoff[emp] = key
 
 # --- Month & Year ---
 year = st.number_input("Year", min_value=2023, max_value=2100, value=2025)
@@ -61,10 +63,6 @@ festival_days = st.multiselect("Festival Days", list(range(1,num_days+1)), defau
 # --- Helper Functions ---
 def get_weekdays(year, month, weekday_indices):
     return [d for d in range(1, monthrange(year, month)[1]+1) if weekday(year, month, d) in weekday_indices]
-
-fridays_saturdays = get_weekdays(year, month, [4,5])
-sundays_mondays = get_weekdays(year, month, [6,0])
-saturdays_sundays = get_weekdays(year, month, [5,6])
 
 def assign_off_days(num_days, total_off, must_off):
     off_set = set(d-1 for d in must_off)
@@ -85,7 +83,7 @@ def assign_off_days(num_days, total_off, must_off):
     off_set.update(chosen)
     return sorted(off_set)
 
-# --- Roster Generation ---
+# --- Main Roster Generation ---
 def generate_roster():
     np.random.seed(42)
     roster = {emp:['']*num_days for emp in employees}
@@ -94,13 +92,14 @@ def generate_roster():
     festival_set = set(festival_days)
     g1_specials = ["Ramesh Polisetty","Srinivasu Cheedalla","Gangavarapu Suneetha","Lakshmi Narayana Rao"]
 
-    # Assign Off Days
+    # Assign Offs
     for emp in employees:
-        weekoff=[]
-        if emp in friday_saturday_off: weekoff=fridays_saturdays
-        elif emp in sunday_monday_off: weekoff=sundays_mondays
-        elif emp in saturday_sunday_off: weekoff=saturdays_sundays
-        off_idx = assign_off_days(num_days, total_off_days, weekoff)
+        pattern = employee_weekoff.get(emp)
+        must_off = []
+        if pattern:
+            wd_indices = weekoff_options[pattern]
+            must_off = get_weekdays(year, month, wd_indices)
+        off_idx = assign_off_days(num_days, total_off_days, must_off)
         for idx in off_idx:
             roster[emp][idx]='O'
             shift_count[emp]['O']+=1
@@ -160,27 +159,16 @@ def generate_roster():
             available.remove(emp)
 
         # --- S shifts ---
-        s_needed = max(0, s_required)
-        s_assigned=0
-        for emp in available:
-            if s_assigned>=s_needed: break
-            roster[emp][day]='S'
-            shift_count[emp]['S']+=1
-            s_assigned+=1
-            available.remove(emp)
-
-        # Assign remaining to S
         for emp in available:
             roster[emp][day]='S'
             shift_count[emp]['S']+=1
 
     return roster
 
-# --- Generate Roster ---
+# --- Generate & Display ---
 roster_dict = generate_roster()
 df_roster = pd.DataFrame(roster_dict, index=dates).T
 
-# --- Color Coding ---
 def color_shifts(val):
     colors={'G1':'limegreen','F':'green','N':'lightblue','S':'lightgreen','O':'lightgray','H':'orange'}
     return f'background-color:{colors.get(val,"")}'
@@ -188,12 +176,10 @@ def color_shifts(val):
 st.subheader("Generated Roster")
 st.dataframe(df_roster.style.applymap(color_shifts), height=600)
 
-# --- Shift Summary ---
 st.subheader("Shift Summary")
 summary = pd.DataFrame({s:[sum(1 for v in roster_dict[e] if v==s) for e in employees]
                         for s in ['G1','F','N','S','O','H']}, index=employees)
 st.dataframe(summary)
 
-# --- Download CSV ---
 csv = df_roster.to_csv().encode('utf-8')
 st.download_button("Download CSV", csv, f"roster_{year}_{month:02d}.csv")
