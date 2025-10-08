@@ -94,20 +94,23 @@ def assign_off_days(num_days, working_days, weekends, is_weekend_exempt):
     num_cycles = remaining_off // 2
     for cycle in range(num_cycles):
         start = cycle * cycle_length + 5  # After 5 working days
-        if start + 1 < num_days:  # Ensure we don't exceed month
+        if start + 1 < num_days and start not in off_days_positions and start + 1 not in off_days_positions:
             off_days_positions.extend([start, start + 1])
     
     # Handle any remaining single off day
     if remaining_off % 2 == 1 and len(off_days_positions) + 1 < num_days:
         last_off = min(num_days - 1, off_days_positions[-1] + cycle_length + 1 if off_days_positions else 5)
-        off_days_positions.append(last_off)
+        if last_off not in off_days_positions:
+            off_days_positions.append(last_off)
     
     return sorted(set(off_days_positions))  # Remove duplicates
 
 # --- Assign Night Shift Blocks (5 nights + 2 off) ---
-def assign_night_shift_blocks(roster_dict, employees, num_days, nightshift_exempt, emp_off_days, leave_data):
+def assign_night_shift_blocks(roster_dict, employees, num_days, nightshift_exempt, emp_off_days, leave_data, min_n_shifts):
     block_length = 7  # 5 nights + 2 off
     debug_info = []
+    # Track night shifts per day to ensure coverage
+    n_shifts_per_day = [0] * num_days
     for emp in employees:
         if emp in nightshift_exempt:
             debug_info.append(f"{emp}: Skipped (nightshift-exempt)")
@@ -118,7 +121,7 @@ def assign_night_shift_blocks(roster_dict, employees, num_days, nightshift_exemp
         if len(available_days) < block_length:
             debug_info.append(f"{emp}: Not enough days for 5N+2O block")
             continue
-        # Try to assign multiple 5N+2O blocks
+        # Find valid 7-day blocks
         valid_starts = []
         for i in range(len(available_days) - block_length + 1):
             block = available_days[i:i + block_length]
@@ -127,25 +130,50 @@ def assign_night_shift_blocks(roster_dict, employees, num_days, nightshift_exemp
         if not valid_starts:
             debug_info.append(f"{emp}: No consecutive 7-day block available")
             continue
-        # Assign as many blocks as possible
-        np.random.shuffle(valid_starts)
+        # Prioritize blocks that help meet night shift coverage
         blocks_assigned = 0
+        np.random.shuffle(valid_starts)
         for start_day in valid_starts:
-            # Check if block is still available
+            # Check if block is available and helps coverage
             if all(roster_dict[emp][start_day + i] not in ['N', 'O', 'L', 'H', 'CO'] for i in range(block_length)):
+                # Check if adding this block helps meet min_n_shifts
+                needed = False
                 for i in range(5):
-                    roster_dict[emp][start_day + i] = 'N'
-                roster_dict[emp][start_day + 5] = 'O'
-                roster_dict[emp][start_day + 6] = 'O'
-                emp_off_days[emp].extend([start_day + 5, start_day + 6])
-                emp_off_days[emp] = sorted(set(emp_off_days[emp]))
-                debug_info.append(f"{emp}: Assigned 5N+2O block starting day {start_day + 1}")
-                blocks_assigned += 1
-                # Update available days
-                available_days = [d for d in available_days if not (start_day <= d < start_day + block_length)]
-                if len(available_days) < block_length:
-                    break
+                    if n_shifts_per_day[start_day + i] < min_n_shifts[start_day + i]:
+                        needed = True
+                        break
+                if needed:
+                    for i in range(5):
+                        roster_dict[emp][start_day + i] = 'N'
+                        n_shifts_per_day[start_day + i] += 1
+                    roster_dict[emp][start_day + 5] = 'O'
+                    roster_dict[emp][start_day + 6] = 'O'
+                    emp_off_days[emp].extend([start_day + 5, start_day + 6])
+                    emp_off_days[emp] = sorted(set(emp_off_days[emp]))
+                    debug_info.append(f"{emp}: Assigned 5N+2O block starting day {start_day + 1}")
+                    blocks_assigned += 1
+                    # Update available days
+                    available_days = [d for d in available_days if not (start_day <= d < start_day + block_length)]
+                    if len(available_days) < block_length:
+                        break
         debug_info.append(f"{emp}: Assigned {blocks_assigned} night shift blocks")
+    
+    # Fallback: Assign single night shifts if coverage is insufficient
+    for day in range(num_days):
+        day_num = day + 1
+        is_special = day_num in get_weekends(year, month) or day_num in festival_days
+        min_n = 3 if is_special else 2
+        if n_shifts_per_day[day] < min_n:
+            available_emps = [emp for emp in employees if emp not in nightshift_exempt and day not in emp_off_days[emp] and roster_dict[emp][day] not in ['N', 'O', 'L', 'H', 'CO']]
+            np.random.shuffle(available_emps)
+            for emp in available_emps:
+                if n_shifts_per_day[day] < min_n:
+                    roster_dict[emp][day] = 'N'
+                    n_shifts_per_day[day] += 1
+                    debug_info.append(f"{emp}: Assigned single N shift on day {day + 1} to meet coverage")
+                else:
+                    break
+    
     return roster_dict, emp_off_days, debug_info
 
 # --- Assign Structured Shifts ---
@@ -167,8 +195,11 @@ def assign_shifts(employees, num_days, working_days, weekends, festival_days, ni
             if code:
                 roster_dict[emp][day-1] = code
     
+    # Define minimum night shifts per day
+    min_n_shifts = [3 if day + 1 in weekends or day + 1 in festival_days else 2 for day in range(num_days)]
+    
     # Assign night shift blocks (5 nights + 2 off)
-    roster_dict, emp_off_days, debug_info = assign_night_shift_blocks(roster_dict, employees, num_days, nightshift_exempt, emp_off_days, leave_data)
+    roster_dict, emp_off_days, debug_info = assign_night_shift_blocks(roster_dict, employees, num_days, nightshift_exempt, emp_off_days, leave_data, min_n_shifts)
     
     # Display debug info
     st.subheader("Night Shift Assignment Debug Info")
@@ -203,6 +234,7 @@ def assign_shifts(employees, num_days, working_days, weekends, festival_days, ni
         s_count = sum(1 for emp in employees if roster_dict[emp][day] == 'S')
         
         # Assign G1 to eligible employees
+        np.random.shuffle(g1_employees)  # Shuffle to avoid bias
         for emp in g1_employees:
             if emp in available_emps and g1_count + f_count < min_fg1:
                 roster_dict[emp][day] = 'G1'
@@ -220,6 +252,7 @@ def assign_shifts(employees, num_days, working_days, weekends, festival_days, ni
                 break
         
         # Assign S to meet min_s
+        np.random.shuffle(available_emps)
         for emp in available_emps:
             if s_count < min_s:
                 roster_dict[emp][day] = 'S'
@@ -275,8 +308,10 @@ for emp in employees:
 if coverage_issues or night_shift_issues:
     if coverage_issues:
         st.warning("Coverage Issues:\n" + "\n".join(coverage_issues))
+        st.info("To resolve coverage issues, try reducing nightshift-exempt or weekend-exempt employees, or adjust leaves.")
     if night_shift_issues:
         st.warning("Night Shift Issues:\n" + "\n".join(night_shift_issues))
+        st.info("To resolve night shift issues, ensure employees have enough consecutive days available by reducing weekend exemptions or leaves.")
 else:
     st.success("✅ Full 24/7 coverage achieved with night shift constraints!")
 
