@@ -39,11 +39,8 @@ employee_data = pd.DataFrame([
 
 employees = employee_data["Name"].tolist()
 
-# --- Fixed Roster for Non-Special Employees ---
+# --- Fixed Roster for Non-Special Employees (Excluding Ajay, Imran, Sammeta) ---
 fixed_roster = {
-    "Ajay Chidipotu": ['O','O','N','N','N','N','N','O','O','N','N','N','N','N','O','O','N','N','N','N','N','O','O','N','N','N','N','N','O','O'],
-    "Imran Khan": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
-    "Sammeta Balachander": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
     "Ramesh Polisetty": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
     "Muppa Divya": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
     "Anil Athkuri": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
@@ -136,17 +133,17 @@ def generate_roster():
     shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}
     
     # Assign fixed shifts for non-special employees
-    special_employees = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
+    special_employees_1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
+    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
     for emp in employees:
-        if emp not in special_employees:
+        if emp not in special_employees_1 and emp not in special_employees_2:
             for day in range(num_days):
-                # Check if day is within fixed_roster length
                 if emp in fixed_roster and day < len(fixed_roster[emp]) and fixed_roster[emp][day] in ['F', 'S', 'N', 'O']:
                     roster[emp][day] = fixed_roster[emp][day]
                     if roster[emp][day] in ['F', 'S', 'N']:
                         shift_counts[emp][roster[emp][day]] += 1
 
-    # Override fixed roster with festival days
+    # Override with festival days
     festival_set = set(festival_days)
     for day in range(num_days):
         if day + 1 in festival_set:
@@ -155,8 +152,8 @@ def generate_roster():
                 if emp in shift_counts and roster[emp][day] in ['F', 'S', 'N']:
                     shift_counts[emp][roster[emp][day]] -= 1  # Adjust counts if overridden
 
-    # Assign shifts for special employees
-    shift_cycle = ['F', 'S', 'N']
+    # Assign shifts for special employees (Group 1: Gopalakrishnan, Paneerselvam, Rajesh)
+    shift_cycle_1 = ['F', 'S', 'N']
     rotation_length = 5
     
     for day in range(num_days):
@@ -164,18 +161,18 @@ def generate_roster():
         if day_num in festival_set:
             continue  # Already assigned 'H'
         
-        # Assign week-offs for special employees
-        off_idx = assign_off_days(special_employees[0], num_days)  # All three have same week-offs
+        # Assign week-offs for special employees (Group 1)
+        off_idx = assign_off_days(special_employees_1[0], num_days)  # All three have same week-offs
         if day in off_idx:
-            for emp in special_employees:
+            for emp in special_employees_1:
                 roster[emp][day] = 'O'
             continue
         
-        # Assign shifts for special employees
+        # Assign shifts for Group 1
         cycle_index = (day // rotation_length) % 3
-        shifts = [shift_cycle[cycle_index], shift_cycle[(cycle_index + 1) % 3], shift_cycle[(cycle_index + 2) % 3]]
+        shifts = [shift_cycle_1[cycle_index], shift_cycle_1[(cycle_index + 1) % 3], shift_cycle_1[(cycle_index + 2) % 3]]
         
-        for i, emp in enumerate(special_employees):
+        for i, emp in enumerate(special_employees_1):
             if roster[emp][day] == 'O':
                 continue
             proposed_shift = shifts[i]
@@ -184,8 +181,42 @@ def generate_roster():
             if shift_counts[emp][proposed_shift] < employee_data.loc[employee_data['Name'] == emp, f"{proposed_shift}_max"].values[0]:
                 roster[emp][day] = proposed_shift
                 shift_counts[emp][proposed_shift] += 1
+
+    # Assign shifts for special employees (Group 2: Ajay, Imran, Sammeta)
+    shift_cycle_2 = ['N', 'F', 'S']  # Prefer Ajay=N, Imran=F, Sammeta=S to align with original roster
+    for day in range(num_days):
+        day_num = day + 1
+        if day_num in festival_set:
+            continue
         
-        # Verify shift requirements
+        # Assign week-offs for Group 2
+        off_idx = assign_off_days(special_employees_2[0], num_days)  # All three have same week-offs (Tue-Wed)
+        if day in off_idx:
+            for emp in special_employees_2:
+                roster[emp][day] = 'O'
+            continue
+        
+        # Assign different shifts for Group 2
+        available_shifts = ['F', 'S', 'N']
+        np.random.shuffle(available_shifts)  # Randomize to vary assignments
+        for i, emp in enumerate(special_employees_2):
+            if roster[emp][day] == 'O':
+                continue
+            # Find a valid shift that respects constraints
+            for shift in available_shifts:
+                if shift in ['N'] and emp in nightshift_exempt:
+                    continue
+                if shift_counts[emp][shift] < employee_data.loc[employee_data['Name'] == emp, f"{shift}_max"].values[0]:
+                    # Ensure different shifts from others in Group 2
+                    if shift not in [roster[e][day] for e in special_employees_2 if roster[e][day] in ['F', 'S', 'N']]:
+                        roster[emp][day] = shift
+                        shift_counts[emp][shift] += 1
+                        available_shifts.remove(shift)  # Ensure no reuse
+                        break
+
+    # Verify shift requirements
+    for day in range(num_days):
+        day_num = day + 1
         weekday_name = weekday(year, month, day_num)
         is_weekend = weekday_name >= 5
         F_req, S_req, N_req = (3, 3, 2) if is_weekend else (5, 5, 2)
