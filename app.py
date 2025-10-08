@@ -39,7 +39,7 @@ employee_data = pd.DataFrame([
 
 employees = employee_data["Name"].tolist()
 
-# --- Fixed Roster for Non-Special Employees (Corrected Syntax) ---
+# --- Fixed Roster for Non-Special Employees ---
 fixed_roster = {
     "Muppa Divya": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
     "Anil Athkuri": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
@@ -133,7 +133,23 @@ def generate_roster():
     
     # Assign fixed shifts for non-special employees
     special_employees_1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander", "Ramesh Polisetty"]
+    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
+    
+    # Assign provided roster for Ajay, Imran, Sammeta
+    provided_roster = {
+        "Ajay Chidipotu": ['O','O','N','N','N','N','N','O','O','F','F','F','F','F','O','O','N','N','N','N','N','O','O','F','F','F','F','F','O','O'],
+        "Imran Khan": ['O','O','F','F','F','F','F','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','F','F','F','F','F','O','O'],
+        "Sammeta Balachander": ['O','O','S','S','S','S','S','O','O','N','N','N','N','N','O','O','F','F','F','F','F','O','O','S','S','S','S','S','O','O']
+    }
+    
+    for emp in special_employees_2:
+        for day in range(num_days):
+            if day < len(provided_roster[emp]) and provided_roster[emp][day] in ['F', 'S', 'N', 'O']:
+                roster[emp][day] = provided_roster[emp][day]
+                if roster[emp][day] in ['F', 'S', 'N']:
+                    shift_counts[emp][roster[emp][day]] += 1
+
+    # Assign fixed roster for other non-special employees
     for emp in employees:
         if emp not in special_employees_1 and emp not in special_employees_2:
             for day in range(num_days):
@@ -149,7 +165,7 @@ def generate_roster():
             for emp in employees:
                 roster[emp][day] = 'H'
                 if emp in shift_counts and roster[emp][day] in ['F', 'S', 'N']:
-                    shift_counts[emp][roster[emp][day]] -= 1  # Adjust counts if overridden
+                    shift_counts[emp][roster[emp][day]] -= 1
 
     # Assign shifts for Group 1 (Gopalakrishnan, Paneerselvam, Rajesh) - 5-day opposite shifts
     shift_cycle_1 = ['F', 'S', 'N']
@@ -178,54 +194,6 @@ def generate_roster():
             if shift_counts[emp][proposed_shift] < employee_data.loc[employee_data['Name'] == emp, f"{proposed_shift}_max"].values[0]:
                 roster[emp][day] = proposed_shift
                 shift_counts[emp][proposed_shift] += 1
-
-    # Assign shifts for Group 2 (Ajay, Imran, Sammeta, Ramesh) - Weekly opposite shifts
-    shift_cycle_2 = ['N', 'F', 'S', 'F']  # Ajay=N, Imran=F, Sammeta=S, Ramesh=F for Week 1
-    rotation_length_2 = 7
-    for block in range(0, num_days, rotation_length_2):
-        cycle_index = (block // rotation_length_2) % 3
-        shifts = [
-            shift_cycle_2[cycle_index],  # Ajay
-            shift_cycle_2[(cycle_index + 1) % 3],  # Imran
-            shift_cycle_2[(cycle_index + 2) % 3],  # Sammeta
-            shift_cycle_2[cycle_index] if shift_cycle_2[cycle_index] != shift_cycle_2[(cycle_index + 2) % 3] else 'F'  # Ramesh opposite to Ajay/Sammeta
-        ]
-        if shifts[1] == 'N':  # Imran cannot take N
-            shifts[1], shifts[0] = shifts[0], shifts[1]
-            if shifts[1] == shifts[2]:
-                shifts[2] = 'F' if shifts[1] == 'S' else 'S'
-            shifts[3] = 'F' if shifts[0] != 'F' and shifts[2] != 'F' else 'S'  # Ramesh opposite
-        if shifts[3] == 'N':  # Ramesh cannot take N
-            shifts[3] = 'F' if shifts[0] != 'F' and shifts[2] != 'F' else 'S'
-        
-        for day in range(block, min(block + rotation_length_2, num_days)):
-            day_num = day + 1
-            if day_num in festival_set:
-                continue
-            
-            off_idx = assign_off_days(special_employees_2[0], num_days)
-            if day in off_idx:
-                for emp in special_employees_2:
-                    roster[emp][day] = 'O'
-                continue
-            
-            for i, emp in enumerate(special_employees_2):
-                if roster[emp][day] == 'O':
-                    continue
-                proposed_shift = shifts[i]
-                if proposed_shift in ['N'] and emp in nightshift_exempt:
-                    continue
-                if shift_counts[emp][proposed_shift] < employee_data.loc[employee_data['Name'] == emp, f"{proposed_shift}_max"].values[0]:
-                    roster[emp][day] = proposed_shift
-                    shift_counts[emp][proposed_shift] += 1
-                else:
-                    available_shifts = ['F', 'S', 'N'] if emp not in nightshift_exempt else ['F', 'S']
-                    for alt_shift in available_shifts:
-                        if alt_shift != proposed_shift and alt_shift not in [roster[e][day] for e in special_employees_2 if e != emp and roster[e][day] in ['F', 'S', 'N']]:
-                            if shift_counts[emp][alt_shift] < employee_data.loc[employee_data['Name'] == emp, f"{alt_shift}_max"].values[0]:
-                                roster[emp][day] = alt_shift
-                                shift_counts[emp][alt_shift] += 1
-                                break
 
     # Verify shift requirements
     for day in range(num_days):
