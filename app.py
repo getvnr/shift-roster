@@ -152,7 +152,7 @@ def generate_roster():
                 if emp in shift_counts and roster[emp][day] in ['F', 'S', 'N']:
                     shift_counts[emp][roster[emp][day]] -= 1  # Adjust counts if overridden
 
-    # Assign shifts for special employees (Group 1: Gopalakrishnan, Paneerselvam, Rajesh)
+    # Assign shifts for Group 1 (Gopalakrishnan, Paneerselvam, Rajesh) - Opposite shifts
     shift_cycle_1 = ['F', 'S', 'N']
     rotation_length = 5
     
@@ -161,7 +161,7 @@ def generate_roster():
         if day_num in festival_set:
             continue  # Already assigned 'H'
         
-        # Assign week-offs for special employees (Group 1)
+        # Assign week-offs for Group 1
         off_idx = assign_off_days(special_employees_1[0], num_days)  # All three have same week-offs
         if day in off_idx:
             for emp in special_employees_1:
@@ -182,37 +182,33 @@ def generate_roster():
                 roster[emp][day] = proposed_shift
                 shift_counts[emp][proposed_shift] += 1
 
-    # Assign shifts for special employees (Group 2: Ajay, Imran, Sammeta)
-    shift_cycle_2 = ['N', 'F', 'S']  # Prefer Ajay=N, Imran=F, Sammeta=S to align with original roster
-    for day in range(num_days):
-        day_num = day + 1
-        if day_num in festival_set:
-            continue
+    # Assign shifts for Group 2 (Ajay, Imran, Sammeta) - Same shift in 5-day blocks
+    shift_cycle_2 = ['F', 'S']  # Only F or S due to Imran's N_max=0
+    for block in range(0, num_days, rotation_length):
+        # Determine shift for the 5-day block
+        block_shift = shift_cycle_2[(block // rotation_length) % len(shift_cycle_2)]
         
-        # Assign week-offs for Group 2
-        off_idx = assign_off_days(special_employees_2[0], num_days)  # All three have same week-offs (Tue-Wed)
-        if day in off_idx:
-            for emp in special_employees_2:
-                roster[emp][day] = 'O'
-            continue
-        
-        # Assign different shifts for Group 2
-        available_shifts = ['F', 'S', 'N']
-        np.random.shuffle(available_shifts)  # Randomize to vary assignments
-        for i, emp in enumerate(special_employees_2):
-            if roster[emp][day] == 'O':
+        for day in range(block, min(block + rotation_length, num_days)):
+            day_num = day + 1
+            if day_num in festival_set:
+                continue  # Skip festival days
+            
+            # Assign week-offs for Group 2
+            off_idx = assign_off_days(special_employees_2[0], num_days)  # All three have same week-offs
+            if day in off_idx:
+                for emp in special_employees_2:
+                    roster[emp][day] = 'O'
                 continue
-            # Find a valid shift that respects constraints
-            for shift in available_shifts:
-                if shift in ['N'] and emp in nightshift_exempt:
+            
+            # Assign the same shift to all Group 2 employees
+            for emp in special_employees_2:
+                if roster[emp][day] == 'O':
                     continue
-                if shift_counts[emp][shift] < employee_data.loc[employee_data['Name'] == emp, f"{shift}_max"].values[0]:
-                    # Ensure different shifts from others in Group 2
-                    if shift not in [roster[e][day] for e in special_employees_2 if roster[e][day] in ['F', 'S', 'N']]:
-                        roster[emp][day] = shift
-                        shift_counts[emp][shift] += 1
-                        available_shifts.remove(shift)  # Ensure no reuse
-                        break
+                if block_shift in ['N'] and emp in nightshift_exempt:
+                    continue
+                if shift_counts[emp][block_shift] < employee_data.loc[employee_data['Name'] == emp, f"{block_shift}_max"].values[0]:
+                    roster[emp][day] = block_shift
+                    shift_counts[emp][block_shift] += 1
 
     # Verify shift requirements
     for day in range(num_days):
