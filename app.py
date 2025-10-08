@@ -13,7 +13,7 @@ employee_data = pd.DataFrame([
     ["Paneerselvam F", 5, 5, 10, "IIS"],
     ["Rajesh Jayapalan", 5, 5, 10, "IIS"],
     ["Ajay Chidipotu", 5, 5, 10, "Websphere"],
-    ["Imran Khan", 5, 15, 0, "Websphere"],
+    ["Imran Khan", 5, 10, 5, "Websphere"],
     ["Sammeta Balachander", 5, 5, 10, "Websphere"],
     ["Ramesh Polisetty", 0, 20, 0, ""],
     ["Muppa Divya", 0, 20, 0, ""],
