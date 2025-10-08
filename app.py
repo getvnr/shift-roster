@@ -6,18 +6,14 @@ import uuid
 
 # Set page configuration
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (Balanced Shifts)")
+st.title("Automated 24/7 Shift Roster Generator (13 Employees, Balanced Shifts)")
 
 # --- Employee Input ---
 st.subheader("Employee List")
 default_employees = [
-    "Ramesh Polisetty", "Ajay Chidipotu", "Srinivasu Cheedalla", "Imran Khan",
-    "Sammeta Balachander", "Muppa Divya", "Anil Athkuri", "Gangavarapu Suneetha",
-    "Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan", "Lakshmi Narayana Rao",
-    "Gayatri Ruttala", "Pousali C", "D Namithananda", "Thorat Yashwant",
-    "Srivastav Nitin", "Kishore Khati Vaibhav", "Rupan Venkatesan Anandha",
-    "Chaudhari Kaustubh", "Shejal Gawade", "Vivek Kushwaha", "Abdul Mukthiyar Basha",
-    "M Naveen", "B Madhurusha", "Chinthalapudi Yaswanth", "Edagotti Kalpana"
+    "Pousali C", "Thorat Yashwant", "Srivastav Nitin", "Kishore Khati Vaibhav",
+    "Rupan Venkatesan Anandha", "Chaudhari Kaustubh", "Shejal Gawade", "Vivek Kushwaha",
+    "Abdul Mukthiyar Basha", "M Naveen", "B Madhurusha", "Chinthalapudi Yaswanth", "Edagotti Kalpana"
 ]
 employees = st.text_area("Enter employee names (comma separated):", value=", ".join(default_employees))
 employees = [e.strip() for e in employees.split(",") if e.strip()]
@@ -30,7 +26,7 @@ st.subheader("Nightshift-Exempt Employees")
 nightshift_exempt = st.multiselect(
     "Select employees who won't work night shifts (no 'N' shifts):",
     options=employees,
-    default=["Ramesh Polisetty", "Srinivasu Cheedalla"]
+    default=[]
 )
 
 # --- Week-off Groups ---
@@ -41,7 +37,7 @@ with tab1:
     friday_saturday_off = st.multiselect(
         "Select employees with Friday-Saturday week-offs:",
         options=employees,
-        default=["Gangavarapu Suneetha", "Lakshmi Narayana Rao"],
+        default=[],
         key="friday_saturday_off"
     )
 
@@ -49,7 +45,7 @@ with tab2:
     sunday_monday_off = st.multiselect(
         "Select employees with Sunday-Monday week-offs:",
         options=employees,
-        default=["Ajay Chidipotu", "Imran Khan"],
+        default=[],
         key="sunday_monday_off"
     )
 
@@ -57,7 +53,7 @@ with tab3:
     saturday_sunday_off = st.multiselect(
         "Select employees with Saturday-Sunday week-offs:",
         options=employees,
-        default=["Muppa Divya", "Anil Athkuri"],
+        default=[],
         key="saturday_sunday_off"
     )
 
@@ -155,7 +151,7 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
     
     # Pre-assign off days
     emp_off_days = {}
-    g1_employees = ["Ramesh Polisetty", "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao"]
+    g1_employees = []  # No G1-eligible employees in this subset
     for emp in employees:
         is_friday_saturday = emp in friday_saturday_off
         is_sunday_monday = emp in sunday_monday_off
@@ -183,21 +179,19 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
             continue
         
         # Minimum shift requirements
-        min_fg1 = 3  # Morning (F or G1)
+        min_fg1 = 3  # Morning (F only, since no G1 employees)
         min_n = 2    # Night
         min_s = 3    # Second
         
-        # Available employees (not off, not on leave/special)
+        # Available employees
         available_emps = [emp for emp in employees if roster_dict[emp][day] == '']
         
         # Assign Night shifts (N)
         non_exempt_available = [emp for emp in available_emps if emp not in nightshift_exempt]
-        # Sort by fewest night shifts to balance
         non_exempt_available.sort(key=lambda emp: (shift_counts[emp]['N'], np.random.random()))
         n_count = 0
         for emp in non_exempt_available:
             if n_count < min_n:
-                # Check for max 5 consecutive night shifts
                 if day >= 5:
                     if all(roster_dict[emp][d] == 'N' for d in range(day-5, day)):
                         continue
@@ -206,22 +200,11 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 n_count += 1
                 available_emps.remove(emp)
         
-        # Assign Morning shifts (G1 then F)
-        g1_available = [emp for emp in available_emps if emp in g1_employees]
-        g1_available.sort(key=lambda emp: (shift_counts[emp]['G1'], np.random.random()))
-        f_count = 0
-        g1_count = 0
-        for emp in g1_available:
-            if g1_count + f_count < min_fg1:
-                roster_dict[emp][day] = 'G1'
-                shift_counts[emp]['G1'] += 1
-                g1_count += 1
-                available_emps.remove(emp)
-        
-        # Assign F to meet min_fg1
+        # Assign Morning shifts (F)
         available_emps.sort(key=lambda emp: (shift_counts[emp]['F'], np.random.random()))
+        f_count = 0
         for emp in available_emps:
-            if g1_count + f_count < min_fg1:
+            if f_count < min_fg1:
                 roster_dict[emp][day] = 'F'
                 shift_counts[emp]['F'] += 1
                 f_count += 1
@@ -237,7 +220,7 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 s_count += 1
                 available_emps.remove(emp)
         
-        # Assign remaining as S to balance workload
+        # Assign remaining as S
         for emp in available_emps:
             roster_dict[emp][day] = 'S'
             shift_counts[emp]['S'] += 1
