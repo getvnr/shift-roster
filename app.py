@@ -31,26 +31,45 @@ nightshift_exempt = st.multiselect(
     default=["Ramesh Polisetty", "Srinivasu Cheedalla"]
 )
 
-# --- Friday-Saturday Week-off Employees ---
-st.subheader("Friday-Saturday Week-off Employees")
-friday_saturday_off = st.multiselect(
-    "Select employees with Friday-Saturday week-offs:",
-    options=employees,
-    default=["Gangavarapu Suneetha", "Lakshmi Narayana Rao"]
-)
+# --- Week-off Groups ---
+st.subheader("Week-off Preferences")
+tab1, tab2, tab3 = st.tabs(["Friday-Saturday Off", "Sunday-Monday Off", "Saturday-Sunday Off"])
 
-# --- Sunday-Monday Week-off Employees ---
-st.subheader("Sunday-Monday Week-off Employees")
-sunday_monday_off = st.multiselect(
-    "Select employees with Sunday-Monday week-offs:",
-    options=employees,
-    default=["Ajay Chidipotu", "Imran Khan"]
-)
+with tab1:
+    friday_saturday_off = st.multiselect(
+        "Select employees with Friday-Saturday week-offs:",
+        options=employees,
+        default=["Gangavarapu Suneetha", "Lakshmi Narayana Rao"],
+        key="friday_saturday_off"
+    )
 
-# Validate no employee is in both week-off groups
-overlap = set(friday_saturday_off).intersection(set(sunday_monday_off))
-if overlap:
-    st.error(f"Employees cannot have both Friday-Saturday and Sunday-Monday week-offs: {', '.join(overlap)}")
+with tab2:
+    sunday_monday_off = st.multiselect(
+        "Select employees with Sunday-Monday week-offs:",
+        options=employees,
+        default=["Ajay Chidipotu", "Imran Khan"],
+        key="sunday_monday_off"
+    )
+
+with tab3:
+    saturday_sunday_off = st.multiselect(
+        "Select employees with Saturday-Sunday week-offs:",
+        options=employees,
+        default=["Muppa Divya", "Anil Athkuri"],
+        key="saturday_sunday_off"
+    )
+
+# Validate no employee is in multiple week-off groups
+weekoff_groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off]
+group_names = ["Friday-Saturday", "Sunday-Monday", "Saturday-Sunday"]
+overlap_issues = []
+for i in range(len(weekoff_groups)):
+    for j in range(i + 1, len(weekoff_groups)):
+        overlap = set(weekoff_groups[i]).intersection(set(weekoff_groups[j]))
+        if overlap:
+            overlap_issues.append(f"Employees in both {group_names[i]} and {group_names[j]}: {', '.join(overlap)}")
+if overlap_issues:
+    st.error("\n".join(overlap_issues))
     st.stop()
 
 # --- Month & Year ---
@@ -59,11 +78,11 @@ month = st.selectbox("Select Month:", list(range(1, 13)), format_func=lambda x: 
 num_days = monthrange(year, month)[1]
 dates = [f"{day}-{month}-{year}" for day in range(1, num_days+1)]
 
-# --- Working Days & Week-Offs ---
+# --- Working Days ---
 working_days_per_emp = st.number_input("Number of working days per employee:", min_value=1, max_value=num_days, value=21)
-weekoff_per_emp = st.number_input("Number of week-off days per employee (excluding fixed week-offs):", min_value=0, max_value=num_days-working_days_per_emp, value=2)
-if working_days_per_emp + weekoff_per_emp > num_days:
-    st.error("Working days plus additional week-off days cannot exceed the number of days in the month.")
+total_off_days = num_days - working_days_per_emp
+if total_off_days < 0:
+    st.error("Working days cannot exceed the number of days in the month.")
     st.stop()
 
 # --- Festivals ---
@@ -84,7 +103,7 @@ for emp in employees:
             codes[i] = st.selectbox(f"Code for day {leave_days[i]}:", ['L', 'H', 'CO'], key=f"code_{emp}_{i}")
     leave_data[emp] = dict(zip(leave_days, codes))
 
-# --- Get Fridays, Saturdays, Sundays, Mondays ---
+# --- Get Specific Days ---
 def get_specific_days(year, month, target_days):
     days = []
     for day in range(1, monthrange(year, month)[1]+1):
@@ -93,10 +112,11 @@ def get_specific_days(year, month, target_days):
     return days
 
 fridays_saturdays = get_specific_days(year, month, [4, 5])  # 4=Friday, 5=Saturday
-sundays_mondays = get_specific_days(year, month, [6, 0])   # 6=Sunday, 0=Monday
+sundays_mondays = get_specific_days(year, month, [6, 0])    # 6=Sunday, 0=Monday
+saturdays_sundays = get_specific_days(year, month, [5, 6]) # 5=Saturday, 6=Sunday
 
-# --- Assign Off Days ---
-def assign_off_days(num_days, working_days, weekoff, fridays_saturdays, sundays_mondays, is_friday_saturday, is_sunday_monday):
+# --- Assign Off Days (2 consecutive off days after 5 working days) ---
+def assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday):
     total_off = num_days - working_days
     off_days_positions = []
     
@@ -105,19 +125,31 @@ def assign_off_days(num_days, working_days, weekoff, fridays_saturdays, sundays_
         off_days_positions.extend([d-1 for d in fridays_saturdays])
     elif is_sunday_monday:
         off_days_positions.extend([d-1 for d in sundays_mondays])
+    elif is_saturday_sunday:
+        off_days_positions.extend([d-1 for d in saturdays_sundays])
     
-    # Add remaining off days evenly
     remaining_off = total_off - len(off_days_positions)
-    if remaining_off > 0:
-        interval = max(1, num_days // remaining_off)
-        additional_off = [i for i in range(interval-1, num_days, interval)][:remaining_off]
-        off_days_positions.extend(additional_off)
+    if remaining_off < 0:
+        return off_days_positions  # Cannot satisfy, return fixed week-offs only
+    
+    # Add pairs of consecutive off days after 5 working days
+    cycle_length = 7  # 5 working + 2 off
+    num_cycles = remaining_off // 2
+    for cycle in range(num_cycles):
+        start = cycle * cycle_length + 5  # After 5 working days
+        if start + 1 < num_days:  # Ensure we don't exceed month
+            off_days_positions.extend([start, start + 1])
+    
+    # Handle any remaining single off day
+    if remaining_off % 2 == 1 and len(off_days_positions) + 1 < num_days:
+        last_off = min(num_days - 1, off_days_positions[-1] + cycle_length + 1 if off_days_positions else 5)
+        off_days_positions.append(last_off)
     
     return sorted(set(off_days_positions))  # Remove duplicates
 
 # --- Assign Structured Shifts ---
 @st.cache_data
-def assign_shifts(employees, num_days, working_days, weekoff, fridays_saturdays, sundays_mondays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, leave_data):
+def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, saturday_sunday_off, leave_data):
     np.random.seed(42)
     roster_dict = {emp: ['S'] * num_days for emp in employees}
     
@@ -127,7 +159,8 @@ def assign_shifts(employees, num_days, working_days, weekoff, fridays_saturdays,
     for emp in employees:
         is_friday_saturday = emp in friday_saturday_off
         is_sunday_monday = emp in sunday_monday_off
-        emp_off_days[emp] = assign_off_days(num_days, working_days, weekoff, fridays_saturdays, sundays_mondays, is_friday_saturday, is_sunday_monday)
+        is_saturday_sunday = emp in saturday_sunday_off
+        emp_off_days[emp] = assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday)
     
     # Apply leaves first
     for emp in employees:
@@ -138,7 +171,7 @@ def assign_shifts(employees, num_days, working_days, weekoff, fridays_saturdays,
     for day in range(num_days):
         day_num = day + 1
         is_festival = day_num in festival_days
-        is_special = day_num in fridays_saturdays or day_num in sundays_mondays or is_festival
+        is_special = day_num in fridays_saturdays or day_num in sundays_mondays or day_num in saturdays_sundays or is_festival
         
         # Festival: All H
         if is_festival:
@@ -195,7 +228,7 @@ def assign_shifts(employees, num_days, working_days, weekoff, fridays_saturdays,
     return roster_dict
 
 # --- Generate Roster ---
-roster_dict = assign_shifts(employees, num_days, working_days_per_emp, weekoff_per_emp, fridays_saturdays, sundays_mondays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, leave_data)
+roster_dict = assign_shifts(employees, num_days, working_days_per_emp, fridays_saturdays, sundays_mondays, saturdays_sundays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, saturday_sunday_off, leave_data)
 
 # --- Coverage Validation ---
 st.subheader("Coverage Check")
@@ -205,7 +238,7 @@ for day in range(num_days):
     f_count = sum(1 for emp in employees if roster_dict[emp][day] == 'F')
     g1_count = sum(1 for emp in employees if roster_dict[emp][day] == 'G1')
     n_count = sum(1 for emp in employees if roster_dict[emp][day] == 'N')
-    is_special = day_num in fridays_saturdays or day_num in sundays_mondays or day_num in festival_days
+    is_special = day_num in fridays_saturdays or day_num in sundays_mondays or day_num in saturdays_sundays or day_num in festival_days
     min_fg1 = 4 if is_special else 3
     min_n = 3 if is_special else 2
     
