@@ -110,7 +110,12 @@ def generate_roster():
 
     festival_set = set(festival_days)
     
-    # Assign Shifts in 5-day blocks
+    # Define shift rotation for Gopalakrishnan, Paneerselvam, and Rajesh
+    special_employees = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
+    shift_cycle = ['F', 'S', 'N']  # 5-day rotation: F -> S -> N
+    rotation_length = 5
+    
+    # Assign shifts for special employees first
     for day in range(num_days):
         day_num = day + 1
         if day_num in festival_set:
@@ -118,23 +123,45 @@ def generate_roster():
                 roster[emp][day] = 'H'
             continue
         
+        # Assign shifts for special employees
+        cycle_index = (day // rotation_length) % 3  # Determine which shift in the cycle
+        shifts = [shift_cycle[cycle_index], shift_cycle[(cycle_index + 1) % 3], shift_cycle[(cycle_index + 2) % 3]]
+        
+        for i, emp in enumerate(special_employees):
+            if roster[emp][day] == 'O':  # Respect week-offs
+                continue
+            if emp in nightshift_exempt and shifts[i] == 'N':  # Skip night shift if exempt
+                continue
+            roster[emp][day] = shifts[i]
+        
+        # Assign shifts for remaining employees
         weekday_name = weekday(year, month, day_num)
         is_weekend = weekday_name >= 5
         
-        # Define required shifts
+        # Define required shifts (adjust for special employees already assigned)
         if is_weekend:
             F_req, S_req, N_req = 3, 3, 2
         else:
             F_req, S_req, N_req = 5, 5, 2
         
-        available = [e for e in employees if roster[e][day] == '']
+        # Count already assigned shifts by special employees
+        assigned_shifts = {'F': 0, 'S': 0, 'N': 0}
+        for emp in special_employees:
+            if roster[emp][day] in assigned_shifts:
+                assigned_shifts[roster[emp][day]] += 1
         
-        # Assign Night shifts first (avoid nightshift exempt)
+        # Adjust required shifts
+        F_req -= assigned_shifts['F']
+        S_req -= assigned_shifts['S']
+        N_req -= assigned_shifts['N']
+        
+        available = [e for e in employees if roster[e][day] == '' and e not in special_employees]
+        
+        # Assign Night shifts
         n_candidates = [e for e in available if e not in nightshift_exempt]
         n_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'N_max'].values[0], reverse=True)
         n_assigned = 0
         for emp in n_candidates:
-            # Check 5-day continuity
             if n_assigned >= N_req: break
             if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
             roster[emp][day] = 'N'
@@ -153,7 +180,9 @@ def generate_roster():
         
         # Assign Second Shift to remaining
         for emp in available:
-            roster[emp][day] = 'S'
+            if S_req > 0:
+                roster[emp][day] = 'S'
+                S_req -= 1
     
     return roster
 
