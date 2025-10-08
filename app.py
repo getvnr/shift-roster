@@ -101,6 +101,7 @@ def assign_off_days(emp_name, num_days):
 def generate_roster():
     np.random.seed(42)
     roster = {emp: [''] * num_days for emp in employees}
+    shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}  # Track shift counts
     
     # Assign Offs
     for emp in employees:
@@ -124,29 +125,33 @@ def generate_roster():
             continue
         
         # Assign shifts for special employees
-        cycle_index = (day // rotation_length) % 3  # Determine which shift in the cycle
+        cycle_index = (day // rotation_length) % 3
         shifts = [shift_cycle[cycle_index], shift_cycle[(cycle_index + 1) % 3], shift_cycle[(cycle_index + 2) % 3]]
         
         for i, emp in enumerate(special_employees):
             if roster[emp][day] == 'O':  # Respect week-offs
                 continue
-            if emp in nightshift_exempt and shifts[i] == 'N':  # Skip night shift if exempt
+            proposed_shift = shifts[i]
+            if emp in nightshift_exempt and proposed_shift == 'N':  # Skip night shift if exempt
                 continue
-            roster[emp][day] = shifts[i]
+            # Check shift limits
+            if shift_counts[emp][proposed_shift] < employee_data.loc[employee_data['Name'] == emp, f"{proposed_shift}_max"].values[0]:
+                roster[emp][day] = proposed_shift
+                shift_counts[emp][proposed_shift] += 1
         
         # Assign shifts for remaining employees
         weekday_name = weekday(year, month, day_num)
         is_weekend = weekday_name >= 5
         
-        # Define required shifts (adjust for special employees already assigned)
+        # Define required shifts
         if is_weekend:
             F_req, S_req, N_req = 3, 3, 2
         else:
             F_req, S_req, N_req = 5, 5, 2
         
-        # Count already assigned shifts by special employees
+        # Count already assigned shifts
         assigned_shifts = {'F': 0, 'S': 0, 'N': 0}
-        for emp in special_employees:
+        for emp in employees:
             if roster[emp][day] in assigned_shifts:
                 assigned_shifts[roster[emp][day]] += 1
         
@@ -155,34 +160,50 @@ def generate_roster():
         S_req -= assigned_shifts['S']
         N_req -= assigned_shifts['N']
         
-        available = [e for e in employees if roster[e][day] == '' and e not in special_employees]
+        available = [e for e in employees if roster[e][day] == '']
+        
+        # Check if enough employees are available
+        if len(available) < (F_req + S_req + N_req):
+            st.warning(f"Insufficient employees available on day {day_num} to meet shift requirements. Needed: {F_req}F, {S_req}S, {N_req}N. Available: {len(available)}")
         
         # Assign Night shifts
         n_candidates = [e for e in available if e not in nightshift_exempt]
+        n_candidates = [e for e in n_candidates if shift_counts[e]['N'] < employee_data.loc[employee_data['Name'] == e, 'N_max'].values[0]]
         n_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'N_max'].values[0], reverse=True)
         n_assigned = 0
         for emp in n_candidates:
             if n_assigned >= N_req: break
             if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
             roster[emp][day] = 'N'
+            shift_counts[emp]['N'] += 1
             n_assigned += 1
             available.remove(emp)
         
         # Assign First Shift
-        f_candidates = available.copy()
+        f_candidates = [e for e in available if shift_counts[e]['F'] < employee_data.loc[employee_data['Name'] == e, 'F_max'].values[0]]
         f_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'F_max'].values[0], reverse=True)
         f_assigned = 0
         for emp in f_candidates:
             if f_assigned >= F_req: break
             roster[emp][day] = 'F'
+            shift_counts[emp]['F'] += 1
             f_assigned += 1
             available.remove(emp)
         
-        # Assign Second Shift to remaining
-        for emp in available:
-            if S_req > 0:
-                roster[emp][day] = 'S'
-                S_req -= 1
+        # Assign Second Shift
+        s_candidates = [e for e in available if shift_counts[e]['S'] < employee_data.loc[employee_data['Name'] == e, 'S_max'].values[0]]
+        for emp in s_candidates:
+            if S_req <= 0: break
+            roster[emp][day] = 'S'
+            shift_counts[emp]['S'] += 1
+            S_req -= 1
+    
+    # Check shift limit violations
+    for emp in employees:
+        for shift in ['F', 'S', 'N']:
+            max_shift = employee_data.loc[employee_data['Name'] == emp, f"{shift}_max"].values[0]
+            if shift_counts[emp][shift] > max_shift:
+                st.warning(f"Shift limit exceeded for {emp}: {shift} assigned {shift_counts[emp][shift]} times, limit is {max_shift}")
     
     return roster
 
