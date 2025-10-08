@@ -5,17 +5,17 @@ from calendar import monthrange, weekday
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (Weekly blocks with opposite shifts)")
+st.title("Automated 24/7 Shift Roster Generator (5-day blocks)")
 
-# --- Default Employees and Shift Limits ---
+# --- Default Employees and Shift Limits (Updated for ~20 working days) ---
 employee_data = pd.DataFrame([
     ["Gopalakrishnan Selvaraj", 5, 5, 10, "IIS"],
     ["Paneerselvam F", 5, 5, 10, "IIS"],
     ["Rajesh Jayapalan", 5, 5, 10, "IIS"],
-    ["Ajay Chidipotu", 5, 5, 10, "Websphere"],
-    ["Imran Khan", 5, 10, 5, "Websphere"],
-    ["Sammeta Balachander", 5, 5, 10, "Websphere"],
-    ["Ramesh Polisetty", 0, 20, 0, ""],
+    ["Ajay Chidipotu", 20, 20, 10, "Websphere"],
+    ["Imran Khan", 20, 20, 0, "Websphere"],
+    ["Sammeta Balachander", 20, 20, 10, "Websphere"],
+    ["Ramesh Polisetty", 20, 20, 0, ""],
     ["Muppa Divya", 0, 20, 0, ""],
     ["Anil Athkuri", 0, 20, 0, ""],
     ["D Namithananda", 0, 20, 0, ""],
@@ -39,27 +39,27 @@ employee_data = pd.DataFrame([
 
 employees = employee_data["Name"].tolist()
 
-# --- Fixed Roster for Non-Special Employees (Excluding Group 1, Group 2, Ramesh) ---
+# --- Fixed Roster for Non-Special Employees ---
 fixed_roster = {
-    "Muppa Divya": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
-    "Anil Athkuri": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
-    "D Namithananda": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
-    "Srinivasu Cheedalla": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
-    "Gangavarapu Suneetha": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
-    "Lakshmi Narayana Rao": ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'],
-    "Pousali C": ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'],
-    "Thorat Yashwant": ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'],
-    "Srivastav Nitin": ['F','F'] + ['']*5 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'],
-    "Kishore Khati Vaibhav": ['F','F'] + ['']*5 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'],
-    "Rupan Venkatesan Anandha": ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'],
-    "Chaudhari Kaustubh": ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O'],
-    "Shejal Gawade": ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S'],
-    "Vivek Kushwaha": ['O','S'] + ['']*5 + ['O','O','S'] + ['']*4 + ['O','O','S'] + ['']*4 + ['O','O','S'] + ['']*4 + ['O','O','S'],
-    "Abdul Mukthiyar Basha": ['O'] + ['']*6 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*1,
-    "M Naveen": ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O'],
-    "B Madhurusha": ['']*2 + ['O','O'] + ['']*3 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O'],
-    "Chinthalapudi Yaswanth": ['']*2 + ['O','O'] + ['']*3 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O'],
-    "Edagotti Kalpana": ['O'] + ['']*6 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*1
+    ["Muppa Divya", 'O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
+    ["Anil Athkuri", 'O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
+    ["D Namithananda", 'O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
+    ["Srinivasu Cheedalla", 'O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
+    ["Gangavarapu Suneetha", 'O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
+    ["Lakshmi Narayana Rao", ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O']],
+    ["Pousali C", ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O']],
+    ["Thorat Yashwant", ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O']],
+    ["Srivastav Nitin", ['F','F'] + ['']*5 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O']],
+    ["Kishore Khati Vaibhav", ['F','F'] + ['']*5 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O']],
+    ["Rupan Venkatesan Anandha", ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O']],
+    ["Chaudhari Kaustubh", ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O']],
+    ["Shejal Gawade", ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S']],
+    ["Vivek Kushwaha", ['O','S'] + ['']*5 + ['O','O','S'] + ['']*4 + ['O','O','S'] + ['']*4 + ['O','O','S'] + ['']*4 + ['O','O','S']],
+    ["Abdul Mukthiyar Basha", ['O'] + ['']*6 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*1],
+    ["M Naveen", ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O']],
+    ["B Madhurusha", ['']*2 + ['O','O'] + ['']*3 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O']],
+    ["Chinthalapudi Yaswanth", ['']*2 + ['O','O'] + ['']*3 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O']],
+    ["Edagotti Kalpana", ['O'] + ['']*6 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*1]
 }
 
 # --- Nightshift Exempt ---
@@ -133,7 +133,7 @@ def generate_roster():
     
     # Assign fixed shifts for non-special employees
     special_employees_1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander", "Ramesh Polisetty"]
+    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
     for emp in employees:
         if emp not in special_employees_1 and emp not in special_employees_2:
             for day in range(num_days):
@@ -158,16 +158,14 @@ def generate_roster():
     for day in range(num_days):
         day_num = day + 1
         if day_num in festival_set:
-            continue  # Already assigned 'H'
+            continue
         
-        # Assign week-offs for Group 1
-        off_idx = assign_off_days(special_employees_1[0], num_days)  # All three have same week-offs
+        off_idx = assign_off_days(special_employees_1[0], num_days)
         if day in off_idx:
             for emp in special_employees_1:
                 roster[emp][day] = 'O'
             continue
         
-        # Assign shifts for Group 1
         cycle_index = (day // rotation_length_1) % 3
         shifts = [shift_cycle_1[cycle_index], shift_cycle_1[(cycle_index + 1) % 3], shift_cycle_1[(cycle_index + 2) % 3]]
         
@@ -181,39 +179,32 @@ def generate_roster():
                 roster[emp][day] = proposed_shift
                 shift_counts[emp][proposed_shift] += 1
 
-    # Assign shifts for Group 2 (Ajay, Imran, Sammeta, Ramesh) - Weekly opposite shifts
-    shift_cycle_2 = ['N', 'F', 'S', 'F']  # Ajay=N, Imran=F, Sammeta=S, Ramesh=F
-    rotation_length_2 = 7  # Weekly blocks (Mon-Sun)
+    # Assign shifts for Group 2 (Ajay, Imran, Sammeta) - Weekly opposite shifts
+    shift_cycle_2 = ['N', 'F', 'S']  # Ajay=N, Imran=F, Sammeta=S for Week 1
+    rotation_length_2 = 7
     for block in range(0, num_days, rotation_length_2):
-        # Determine shifts for the week
         cycle_index = (block // rotation_length_2) % 3
         shifts = [
             shift_cycle_2[cycle_index],  # Ajay
             shift_cycle_2[(cycle_index + 1) % 3],  # Imran
-            shift_cycle_2[(cycle_index + 2) % 3],  # Sammeta
-            shift_cycle_2[cycle_index] if shift_cycle_2[cycle_index] != shift_cycle_2[(cycle_index + 2) % 3] else 'F'  # Ramesh opposite to Ajay/Sammeta
+            shift_cycle_2[(cycle_index + 2) % 3]   # Sammeta
         ]
-        # Adjust for Imran's and Ramesh's nightshift exemption
-        if shifts[1] == 'N':  # Imran cannot take N
-            shifts[1], shifts[0] = shifts[0], shifts[1]  # Swap Imran and Ajay
-            if shifts[1] == shifts[2]:  # Ensure Sammeta's shift is different
+        if shifts[1] == 'N':
+            shifts[1], shifts[0] = shifts[0], shifts[1]
+            if shifts[1] == shifts[2]:
                 shifts[2] = 'F' if shifts[1] == 'S' else 'S'
-            # Adjust Ramesh to be opposite to Ajay and Sammeta
-            shifts[3] = 'F' if shifts[0] != 'F' and shifts[2] != 'F' else 'S'
         
         for day in range(block, min(block + rotation_length_2, num_days)):
             day_num = day + 1
             if day_num in festival_set:
-                continue  # Skip festival days
+                continue
             
-            # Assign week-offs for Group 2
-            off_idx = assign_off_days(special_employees_2[0], num_days)  # All four have same week-offs
+            off_idx = assign_off_days(special_employees_2[0], num_days)
             if day in off_idx:
                 for emp in special_employees_2:
                     roster[emp][day] = 'O'
                 continue
             
-            # Assign opposite shifts to Group 2
             for i, emp in enumerate(special_employees_2):
                 if roster[emp][day] == 'O':
                     continue
@@ -224,7 +215,6 @@ def generate_roster():
                     roster[emp][day] = proposed_shift
                     shift_counts[emp][proposed_shift] += 1
                 else:
-                    # Try alternative shift if limit reached
                     available_shifts = ['F', 'S', 'N'] if emp not in nightshift_exempt else ['F', 'S']
                     for alt_shift in available_shifts:
                         if alt_shift != proposed_shift and alt_shift not in [roster[e][day] for e in special_employees_2 if e != emp and roster[e][day] in ['F', 'S', 'N']]:
