@@ -77,7 +77,7 @@ num_days = monthrange(year, month)[1]
 dates = [f"{day:02d}-{month:02d}-{year}" for day in range(1, num_days+1)]
 
 # --- Working Days ---
-working_days_per_emp = st.number_input("Number of working days per employee:", min_value=1, max_value=num_days, value=20)
+working_days_per_emp = st.number_input("Number of working days per employee:", min_value=15, max_value=num_days, value=20)
 total_off_days = num_days - working_days_per_emp
 if total_off_days < 0:
     st.error("Working days cannot exceed the number of days in the month.")
@@ -114,7 +114,7 @@ sundays_mondays = get_specific_days(year, month, [6, 0])    # 6=Sunday, 0=Monday
 saturdays_sundays = get_specific_days(year, month, [5, 6])  # 5=Saturday, 6=Sunday
 
 # --- Assign Off Days ---
-def assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday, leave_data, festival_days):
+def assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday, leave_data, emp):
     total_off = num_days - working_days
     off_days_positions = []
     
@@ -154,7 +154,7 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
         is_friday_saturday = emp in friday_saturday_off
         is_sunday_monday = emp in sunday_monday_off
         is_saturday_sunday = emp in saturday_sunday_off
-        emp_off_days[emp] = assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday, leave_data, festival_days)
+        emp_off_days[emp] = assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday, leave_data, emp)
     
     # Ensure enough employees per day
     for day in range(num_days):
@@ -183,7 +183,7 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 roster_dict[emp][day-1] = code
                 shift_counts[emp][code] += 1
     
-    # Assign F and N shifts first to meet exact targets
+    # Assign F and N shifts to meet exact targets
     for emp in employees:
         available_days = [d for d in range(num_days) if roster_dict[emp][d] == '' and d+1 not in festival_days]
         np.random.shuffle(available_days)
@@ -192,15 +192,14 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
         f_days = []
         for day in available_days:
             if shift_counts[emp]['F'] < target_f:
-                # Ensure day doesn’t exceed daily F limit
                 f_count_day = sum(1 for e in employees if roster_dict[e][day] == 'F')
-                if f_count_day < 3:
+                if f_count_day < 5:  # Allow up to 5 F per day to ensure coverage
                     roster_dict[emp][day] = 'F'
                     shift_counts[emp]['F'] += 1
                     f_days.append(day)
         available_days = [d for d in available_days if d not in f_days]
         
-        # Assign 5 N shifts, respecting nightshift exemption and consecutive limit
+        # Assign 5 N shifts
         if emp not in nightshift_exempt:
             n_days = []
             for day in available_days:
@@ -208,7 +207,7 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                     if day >= 5 and all(roster_dict[emp][d] == 'N' for d in range(day-5, day)):
                         continue
                     n_count_day = sum(1 for e in employees if roster_dict[e][day] == 'N')
-                    if n_count_day < 2:
+                    if n_count_day < 3:  # Allow up to 3 N per day
                         roster_dict[emp][day] = 'N'
                         shift_counts[emp]['N'] += 1
                         n_days.append(day)
@@ -228,7 +227,6 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
         min_n = 2
         min_s = 3
         
-        # Available employees
         available_emps = [emp for emp in employees if roster_dict[emp][day] == '']
         
         # Ensure minimum F shifts
@@ -256,7 +254,7 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 if emp in available_emps:
                     available_emps.remove(emp)
         
-        # Assign S shifts, respecting target_s_min and target_s_max
+        # Assign S shifts
         available_emps.sort(key=lambda emp: (shift_counts[emp]['S'], np.random.random()))
         s_count = sum(1 for emp in employees if roster_dict[emp][day] == 'S')
         for emp in available_emps:
@@ -267,16 +265,16 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
                 if emp in available_emps:
                     available_emps.remove(emp)
         
-        # Assign remaining as S, up to target_s_max
+        # Assign remaining as S
         for emp in available_emps:
             if shift_counts[emp]['S'] < target_s_max:
                 roster_dict[emp][day] = 'S'
                 shift_counts[emp]['S'] += 1
     
-    return roster_dict
+    return roster_dict, shift_counts
 
 # --- Generate Roster ---
-roster_dict = assign_shifts(employees, num_days, working_days_per_emp, fridays_saturdays, sundays_mondays, saturdays_sundays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, saturday_sunday_off, leave_data)
+roster_dict, shift_counts = assign_shifts(employees, num_days, working_days_per_emp, fridays_saturdays, sundays_mondays, saturdays_sundays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, saturday_sunday_off, leave_data)
 
 # --- Coverage Validation ---
 st.subheader("Coverage Check")
@@ -298,12 +296,12 @@ for day in range(num_days):
 shift_count_issues = []
 night_shift_issues = []
 for emp in employees:
-    if shift_counts[emp]['F'] != target_f:
-        shift_count_issues.append(f"⚠️ {emp} has {shift_counts[emp]['F']} F shifts (target {target_f})")
-    if emp not in nightshift_exempt and shift_counts[emp]['N'] != target_n:
-        shift_count_issues.append(f"⚠️ {emp} has {shift_counts[emp]['N']} N shifts (target {target_n})")
-    if not (target_s_min <= shift_counts[emp]['S'] <= target_s_max):
-        shift_count_issues.append(f"⚠️ {emp} has {shift_counts[emp]['S']} S shifts (target {target_s_min}-{target_s_max})")
+    if shift_counts[emp]['F'] != 5:
+        shift_count_issues.append(f"⚠️ {emp} has {shift_counts[emp]['F']} F shifts (target 5)")
+    if emp not in nightshift_exempt and shift_counts[emp]['N'] != 5:
+        shift_count_issues.append(f"⚠️ {emp} has {shift_counts[emp]['N']} N shifts (target 5)")
+    if not (5 <= shift_counts[emp]['S'] <= 10):
+        shift_count_issues.append(f"⚠️ {emp} has {shift_counts[emp]['S']} S shifts (target 5-10)")
     
     if emp in nightshift_exempt:
         continue
