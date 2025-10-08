@@ -39,12 +39,38 @@ employee_data = pd.DataFrame([
 
 employees = employee_data["Name"].tolist()
 
+# --- Fixed Roster for Non-Special Employees ---
+fixed_roster = {
+    "Ajay Chidipotu": ['O','O','N','N','N','N','N','O','O','N','N','N','N','N','O','O','N','N','N','N','N','O','O','N','N','N','N','N','O','O'],
+    "Imran Khan": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
+    "Sammeta Balachander": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
+    "Ramesh Polisetty": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
+    "Muppa Divya": ['O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O','F','F','F','F','F','O','O'],
+    "Anil Athkuri": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
+    "D Namithananda": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
+    "Srinivasu Cheedalla": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
+    "Gangavarapu Suneetha": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O'],
+    "Lakshmi Narayana Rao": ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'],
+    "Pousali C": ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'],
+    "Thorat Yashwant": ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'] + ['N','N'] + ['']*3 + ['O','O'],
+    "Srivastav Nitin": ['F','F'] + ['']*5 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'],
+    "Kishore Khati Vaibhav": ['F','F'] + ['']*5 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'],
+    "Rupan Venkatesan Anandha": ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'] + ['F','F'] + ['']*3 + ['O','O'],
+    "Chaudhari Kaustubh": ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O'] + ['S','S'] + ['']*3 + ['O','O'],
+    "Shejal Gawade": ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S','O','O'] + ['']*3 + ['S','S'],
+    "Vivek Kushwaha": ['O','S'] + ['']*5 + ['O','O','S'] + ['']*4 + ['O','O','S'] + ['']*4 + ['O','O','S'] + ['']*4 + ['O','O','S'],
+    "Abdul Mukthiyar Basha": ['O'] + ['']*6 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*1,
+    "M Naveen": ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O','O'] + ['']*4 + ['S','O'],
+    "B Madhurusha": ['']*2 + ['O','O'] + ['']*3 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O'],
+    "Chinthalapudi Yaswanth": ['']*2 + ['O','O'] + ['']*3 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O'],
+    "Edagotti Kalpana": ['O'] + ['']*6 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*5 + ['O','O'] + ['']*1
+}
+
 # --- Nightshift Exempt ---
 nightshift_exempt = st.multiselect("Nightshift-Exempt Employees", employees, default=["Ramesh Polisetty", "Srinivasu Cheedalla", "Imran Khan"])
 
 # --- Weekoff Preferences ---
 st.subheader("Weekoff Preferences")
-# Default Tuesday-Wednesday for most employees
 default_tue_wed = [
     "Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan", "Ajay Chidipotu",
     "Imran Khan", "Sammeta Balachander", "Ramesh Polisetty", "Muppa Divya", "Anil Athkuri",
@@ -52,10 +78,10 @@ default_tue_wed = [
 ]
 friday_saturday_off = st.multiselect("Friday-Saturday Off", employees, default=[])
 sunday_monday_off = st.multiselect("Sunday-Monday Off", employees, default=[])
-saturday_sunday_off = st.multiselect("Saturday-Sunday Off", employees, default=[])
+saturday_sunday_off = st.multiselect("Saturday-Sunday Off", employees, default=["Shejal Gawade"])
 tuesday_wednesday_off = st.multiselect("Tuesday-Wednesday Off", employees, default=default_tue_wed)
 thursday_friday_off = st.multiselect("Thursday-Friday Off", employees, default=[])
-wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, default=["Lakshmi Narayana Rao"])
+wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, default=["Lakshmi Narayana Rao", "Pousali C", "Thorat Yashwant", "Srivastav Nitin", "Kishore Khati Vaibhav", "Rupan Venkatesan Anandha", "Chaudhari Kaustubh"])
 monday_tuesday_off = st.multiselect("Monday-Tuesday Off", employees, default=["Abdul Mukthiyar Basha", "B Madhurusha", "Chinthalapudi Yaswanth", "Edagotti Kalpana"])
 
 # --- Validate Overlaps ---
@@ -89,7 +115,7 @@ saturdays_sundays = get_weekdays(year, month, [5, 6])
 tuesday_wednesday = get_weekdays(year, month, [1, 2])
 thursday_friday = get_weekdays(year, month, [3, 4])
 wednesday_thursday = get_weekdays(year, month, [2, 3])
-monday_tuesday = get_weekdays(year, month, [0, 1])
+monday_tuesday = get_weekdays(year, month, [0, заявления 1])
 
 # --- Off Days Assignment ---
 def assign_off_days(emp_name, num_days):
@@ -109,25 +135,39 @@ def generate_roster():
     roster = {emp: [''] * num_days for emp in employees}
     shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}
     
-    # Assign Offs
-    for emp in employees:
-        off_idx = assign_off_days(emp, num_days)
-        for idx in off_idx:
-            roster[emp][idx] = 'O'
-
-    festival_set = set(festival_days)
-    
-    # Define shift rotation for Gopalakrishnan, Paneerselvam, and Rajesh
+    # Assign fixed shifts for non-special employees
     special_employees = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
+    for emp in employees:
+        if emp not in special_employees:
+            for day in range(num_days):
+                if emp in fixed_roster and fixed_roster[emp][day] in ['F', 'S', 'N', 'O']:
+                    roster[emp][day] = fixed_roster[emp][day]
+                    if roster[emp][day] in ['F', 'S', 'N']:
+                        shift_counts[emp][roster[emp][day]] += 1
+
+    # Override fixed roster with festival days
+    festival_set = set(festival_days)
+    for day in range(num_days):
+        if day + 1 in festival_set:
+            for emp in employees:
+                roster[emp][day] = 'H'
+                if emp in shift_counts and roster[emp][day] in ['F', 'S', 'N']:
+                    shift_counts[emp][roster[emp][day]] -= 1  # Adjust counts if overridden
+
+    # Assign shifts for special employees
     shift_cycle = ['F', 'S', 'N']
     rotation_length = 5
     
-    # Assign shifts for special employees
     for day in range(num_days):
         day_num = day + 1
         if day_num in festival_set:
-            for emp in employees:
-                roster[emp][day] = 'H'
+            continue  # Already assigned 'H'
+        
+        # Assign week-offs for special employees
+        off_idx = assign_off_days(special_employees[0], num_days)  # All three have same week-offs
+        if day in off_idx:
+            for emp in special_employees:
+                roster[emp][day] = 'O'
             continue
         
         # Assign shifts for special employees
@@ -144,65 +184,18 @@ def generate_roster():
                 roster[emp][day] = proposed_shift
                 shift_counts[emp][proposed_shift] += 1
         
-        # Assign shifts for remaining employees
+        # Verify shift requirements
         weekday_name = weekday(year, month, day_num)
         is_weekend = weekday_name >= 5
+        F_req, S_req, N_req = (3, 3, 2) if is_weekend else (5, 5, 2)
         
-        # Define required shifts
-        if is_weekend:
-            F_req, S_req, N_req = 3, 3, 2
-        else:
-            F_req, S_req, N_req = 5, 5, 2
-        
-        # Count already assigned shifts
         assigned_shifts = {'F': 0, 'S': 0, 'N': 0}
         for emp in employees:
             if roster[emp][day] in assigned_shifts:
                 assigned_shifts[roster[emp][day]] += 1
         
-        # Adjust required shifts
-        F_req -= assigned_shifts['F']
-        S_req -= assigned_shifts['S']
-        N_req -= assigned_shifts['N']
-        
-        available = [e for e in employees if roster[e][day] == '']
-        
-        # Check if enough employees are available
-        if len(available) < (F_req + S_req + N_req):
-            st.warning(f"Insufficient employees available on day {day_num} to meet shift requirements. Needed: {F_req}F, {S_req}S, {N_req}N. Available: {len(available)}")
-        
-        # Assign Night shifts (prioritize Ajay Chidipotu, Sammeta Balachander)
-        n_candidates = [e for e in available if e not in nightshift_exempt]
-        n_candidates = [e for e in n_candidates if shift_counts[e]['N'] < employee_data.loc[employee_data['Name'] == e, 'N_max'].values[0]]
-        n_candidates.sort(key=lambda x: (x in ['Ajay Chidipotu', 'Sammeta Balachander'], employee_data.loc[employee_data['Name'] == x, 'N_max'].values[0]), reverse=True)
-        n_assigned = 0
-        for emp in n_candidates:
-            if n_assigned >= N_req: break
-            if day >= 3 and all(roster[emp][day - 3 + p] == 'N' for p in range(3)): continue
-            roster[emp][day] = 'N'
-            shift_counts[emp]['N'] += 1
-            n_assigned += 1
-            available.remove(emp)
-        
-        # Assign First Shift (prioritize Imran Khan, Sammeta Balachander, Ramesh Polisetty, etc.)
-        f_candidates = [e for e in available if shift_counts[e]['F'] < employee_data.loc[employee_data['Name'] == e, 'F_max'].values[0]]
-        f_candidates.sort(key=lambda x: (x in ['Imran Khan', 'Sammeta Balachander', 'Ramesh Polisetty', 'Muppa Divya', 'Srivastav Nitin', 'Kishore Khati Vaibhav', 'Rupan Venkatesan Anandha'], employee_data.loc[employee_data['Name'] == x, 'F_max'].values[0]), reverse=True)
-        f_assigned = 0
-        for emp in f_candidates:
-            if f_assigned >= F_req: break
-            roster[emp][day] = 'F'
-            shift_counts[emp]['F'] += 1
-            f_assigned += 1
-            available.remove(emp)
-        
-        # Assign Second Shift (prioritize Anil Athkuri, D Namithananda, Srinivasu Cheedalla, etc.)
-        s_candidates = [e for e in available if shift_counts[e]['S'] < employee_data.loc[employee_data['Name'] == e, 'S_max'].values[0]]
-        s_candidates.sort(key=lambda x: (x in ['Anil Athkuri', 'D Namithananda', 'Srinivasu Cheedalla', 'Gangavarapu Suneetha', 'Chaudhari Kaustubh', 'Shejal Gawade', 'Vivek Kushwaha', 'M Naveen'], employee_data.loc[employee_data['Name'] == x, 'S_max'].values[0]), reverse=True)
-        for emp in s_candidates:
-            if S_req <= 0: break
-            roster[emp][day] = 'S'
-            shift_counts[emp]['S'] += 1
-            S_req -= 1
+        if assigned_shifts['F'] < F_req or assigned_shifts['S'] < S_req or assigned_shifts['N'] < N_req:
+            st.warning(f"Day {day_num}: Shift requirements not met. Assigned: {assigned_shifts['F']}F, {assigned_shifts['S']}S, {assigned_shifts['N']}N. Required: {F_req}F, {S_req}S, {N_req}N")
     
     # Check shift limit violations
     for emp in employees:
@@ -219,7 +212,7 @@ df_roster = pd.DataFrame(roster_dict, index=dates).T
 
 # --- Color Coding ---
 def color_shifts(val):
-    colors = {'F': 'green', 'S': 'lightgreen', 'N': 'lightblue', 'O': 'lightgray', 'H': 'orange'}
+    colors = {'F': 'green', 'S': 'lightgreen', 'N': 'lightblue', 'O': 'lightgray', 'H': 'orange', '': 'white'}
     return f'background-color: {colors.get(val, "")}'
 st.subheader("Generated Roster")
 st.dataframe(df_roster.style.applymap(color_shifts), height=600)
@@ -228,7 +221,7 @@ st.dataframe(df_roster.style.applymap(color_shifts), height=600)
 st.subheader("Shift Summary")
 summary = pd.DataFrame({
     s: [sum(1 for v in roster_dict[e] if v == s) for e in employees]
-    for s in ['F', 'S', 'N', 'O', 'H']
+    for s in ['F', 'S', 'N', 'O', 'H', '']
 }, index=employees)
 st.dataframe(summary)
 
