@@ -182,11 +182,21 @@ def generate_roster():
                 roster[emp][day] = proposed_shift
                 shift_counts[emp][proposed_shift] += 1
 
-    # Assign shifts for Group 2 (Ajay, Imran, Sammeta) - Same shift in 5-day blocks
-    shift_cycle_2 = ['F', 'S']  # Only F or S due to Imran's N_max=0
+    # Assign shifts for Group 2 (Ajay, Imran, Sammeta) - Opposite shifts in 5-day blocks
+    shift_cycle_2 = ['N', 'F', 'S']  # Prioritize Ajay=N, Imran=F, Sammeta=S
     for block in range(0, num_days, rotation_length):
-        # Determine shift for the 5-day block
-        block_shift = shift_cycle_2[(block // rotation_length) % len(shift_cycle_2)]
+        # Determine shifts for the 5-day block
+        cycle_index = (block // rotation_length) % 3
+        shifts = [
+            shift_cycle_2[cycle_index],  # Ajay
+            shift_cycle_2[(cycle_index + 1) % 3],  # Imran
+            shift_cycle_2[(cycle_index + 2) % 3]   # Sammeta
+        ]
+        # Adjust for Imran's nightshift exemption
+        if shifts[1] == 'N':  # Imran cannot take N
+            shifts[1], shifts[0] = shifts[0], shifts[1]  # Swap Imran and Ajay
+            if shifts[1] == shifts[2]:  # Ensure Sammeta's shift is different
+                shifts[2] = 'F' if shifts[1] == 'S' else 'S'
         
         for day in range(block, min(block + rotation_length, num_days)):
             day_num = day + 1
@@ -200,15 +210,16 @@ def generate_roster():
                     roster[emp][day] = 'O'
                 continue
             
-            # Assign the same shift to all Group 2 employees
-            for emp in special_employees_2:
+            # Assign opposite shifts to Group 2
+            for i, emp in enumerate(special_employees_2):
                 if roster[emp][day] == 'O':
                     continue
-                if block_shift in ['N'] and emp in nightshift_exempt:
+                proposed_shift = shifts[i]
+                if proposed_shift in ['N'] and emp in nightshift_exempt:
                     continue
-                if shift_counts[emp][block_shift] < employee_data.loc[employee_data['Name'] == emp, f"{block_shift}_max"].values[0]:
-                    roster[emp][day] = block_shift
-                    shift_counts[emp][block_shift] += 1
+                if shift_counts[emp][proposed_shift] < employee_data.loc[employee_data['Name'] == emp, f"{proposed_shift}_max"].values[0]:
+                    roster[emp][day] = proposed_shift
+                    shift_counts[emp][proposed_shift] += 1
 
     # Verify shift requirements
     for day in range(num_days):
@@ -256,3 +267,4 @@ st.dataframe(summary)
 # --- Download CSV ---
 csv = df_roster.to_csv().encode('utf-8')
 st.download_button("Download CSV", csv, f"roster_{year}_{month:02d}.csv")
+
