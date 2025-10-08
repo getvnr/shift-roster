@@ -131,17 +131,14 @@ def generate_roster():
     roster = {emp: [''] * num_days for emp in employees}
     shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}
     
-    # Assign fixed shifts for non-special employees
-    special_employees_1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
-    
     # Assign provided roster for Ajay, Imran, Sammeta
     provided_roster = {
-        "Ajay Chidipotu": ['O','O','N','N','N','N','N','O','O','F','F','F','F','F','O','O','N','N','N','N','N','O','O','F','F','F','F','F','O','O'],
-        "Imran Khan": ['O','O','F','F','F','F','F','O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','F','F','F','F','F','O','O'],
-        "Sammeta Balachander": ['O','O','S','S','S','S','S','O','O','N','N','N','N','N','O','O','F','F','F','F','F','O','O','S','S','S','S','S','O','O']
+        "Ajay Chidipotu": ['O','O','N','N','N','N','N','O','O','F','F','F','F','F','O','O','S','S','S','S','S','O','O','N','N','N','N','N','O','O'],
+        "Imran Khan": ['O','O','S','S','S','S','S','O','O','S','S','S','S','S','O','O','F','F','F','F','F','O','O','S','S','S','S','S','O','O'],
+        "Sammeta Balachander": ['O','O','F','F','F','F','F','O','O','N','N','N','N','N','O','O','N','N','N','N','N','O','O','S','S','S','S','S','O','O']
     }
     
+    special_employees_2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
     for emp in special_employees_2:
         for day in range(num_days):
             if day < len(provided_roster[emp]) and provided_roster[emp][day] in ['F', 'S', 'N', 'O']:
@@ -150,6 +147,7 @@ def generate_roster():
                     shift_counts[emp][roster[emp][day]] += 1
 
     # Assign fixed roster for other non-special employees
+    special_employees_1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
     for emp in employees:
         if emp not in special_employees_1 and emp not in special_employees_2:
             for day in range(num_days):
