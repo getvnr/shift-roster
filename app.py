@@ -4,7 +4,7 @@ import numpy as np
 from calendar import monthrange, weekday
 
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (5 Night Shifts + 2 Off Days)")
+st.title("Automated 24/7 Shift Roster Generator (October 2025)")
 
 # --- Employee Input ---
 st.subheader("Employee List")
@@ -31,50 +31,17 @@ nightshift_exempt = st.multiselect(
     default=["Ramesh Polisetty", "Srinivasu Cheedalla"]
 )
 
-# --- Week-off Groups ---
-st.subheader("Week-off Preferences")
-tab1, tab2, tab3 = st.tabs(["Friday-Saturday Off", "Sunday-Monday Off", "Saturday-Sunday Off"])
-
-with tab1:
-    friday_saturday_off = st.multiselect(
-        "Select employees with Friday-Saturday week-offs:",
-        options=employees,
-        default=["Gangavarapu Suneetha", "Lakshmi Narayana Rao"],
-        key="friday_saturday_off"
-    )
-
-with tab2:
-    sunday_monday_off = st.multiselect(
-        "Select employees with Sunday-Monday week-offs:",
-        options=employees,
-        default=["Ajay Chidipotu", "Imran Khan"],
-        key="sunday_monday_off"
-    )
-
-with tab3:
-    saturday_sunday_off = st.multiselect(
-        "Select employees with Saturday-Sunday week-offs:",
-        options=employees,
-        default=["Muppa Divya", "Anil Athkuri"],
-        key="saturday_sunday_off"
-    )
-
-# Validate no employee is in multiple week-off groups
-weekoff_groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off]
-group_names = ["Friday-Saturday", "Sunday-Monday", "Saturday-Sunday"]
-overlap_issues = []
-for i in range(len(weekoff_groups)):
-    for j in range(i + 1, len(weekoff_groups)):
-        overlap = set(weekoff_groups[i]).intersection(set(weekoff_groups[j]))
-        if overlap:
-            overlap_issues.append(f"Employees in both {group_names[i]} and {group_names[j]}: {', '.join(overlap)}")
-if overlap_issues:
-    st.error("\n".join(overlap_issues))
-    st.stop()
+# --- Weekend-Exempt Employees ---
+st.subheader("Weekend-Exempt Employees")
+weekend_exempt = st.multiselect(
+    "Select employees who won't work on weekends (SA/SU off):",
+    options=employees,
+    default=["Ramesh Polisetty", "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao"]
+)
 
 # --- Month & Year ---
 year = st.number_input("Select Year:", min_value=2023, max_value=2100, value=2025)
-month = st.selectbox("Select Month:", list(range(1, 13)), format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
+month = st.selectbox("Select Month:", list(range(1, 13)), format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'), index=9)
 num_days = monthrange(year, month)[1]
 dates = [f"{day}-{month}-{year}" for day in range(1, num_days+1)]
 
@@ -103,30 +70,20 @@ for emp in employees:
             codes[i] = st.selectbox(f"Code for day {leave_days[i]}:", ['L', 'H', 'CO'], key=f"code_{emp}_{i}")
     leave_data[emp] = dict(zip(leave_days, codes))
 
-# --- Get Specific Days ---
-def get_specific_days(year, month, target_days):
-    days = []
-    for day in range(1, monthrange(year, month)[1]+1):
-        if weekday(year, month, day) in target_days:
-            days.append(day)
-    return days
+# --- Get Weekends ---
+def get_weekends(year, month):
+    return [day for day in range(1, monthrange(year, month)[1]+1) if weekday(year, month, day) >= 5]
 
-fridays_saturdays = get_specific_days(year, month, [4, 5])  # 4=Friday, 5=Saturday
-sundays_mondays = get_specific_days(year, month, [6, 0])    # 6=Sunday, 0=Monday
-saturdays_sundays = get_specific_days(year, month, [5, 6]) # 5=Saturday, 6=Sunday
+weekends = get_weekends(year, month)
 
 # --- Assign Off Days (2 consecutive off days after 5 working days) ---
-def assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday):
+def assign_off_days(num_days, working_days, weekends, is_weekend_exempt):
     total_off = num_days - working_days
     off_days_positions = []
     
-    # Assign fixed week-offs
-    if is_friday_saturday:
-        off_days_positions.extend([d-1 for d in fridays_saturdays])
-    elif is_sunday_monday:
-        off_days_positions.extend([d-1 for d in sundays_mondays])
-    elif is_saturday_sunday:
-        off_days_positions.extend([d-1 for d in saturdays_sundays])
+    # Assign weekend off days for exempt employees
+    if is_weekend_exempt:
+        off_days_positions.extend([d-1 for d in weekends])
     
     remaining_off = total_off - len(off_days_positions)
     if remaining_off < 0:
@@ -193,7 +150,7 @@ def assign_night_shift_blocks(roster_dict, employees, num_days, nightshift_exemp
 
 # --- Assign Structured Shifts ---
 @st.cache_data
-def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, saturday_sunday_off, leave_data):
+def assign_shifts(employees, num_days, working_days, weekends, festival_days, nightshift_exempt, weekend_exempt, leave_data):
     np.random.seed(42)
     roster_dict = {emp: ['S'] * num_days for emp in employees}
     
@@ -201,10 +158,8 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
     emp_off_days = {}
     g1_employees = ["Ramesh Polisetty", "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao"]
     for emp in employees:
-        is_friday_saturday = emp in friday_saturday_off
-        is_sunday_monday = emp in sunday_monday_off
-        is_saturday_sunday = emp in saturday_sunday_off
-        emp_off_days[emp] = assign_off_days(num_days, working_days, fridays_saturdays, sundays_mondays, saturdays_sundays, is_friday_saturday, is_sunday_monday, is_saturday_sunday)
+        is_weekend_exempt = emp in weekend_exempt
+        emp_off_days[emp] = assign_off_days(num_days, working_days, weekends, is_weekend_exempt)
     
     # Apply leaves first
     for emp in employees:
@@ -222,7 +177,8 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
     for day in range(num_days):
         day_num = day + 1
         is_festival = day_num in festival_days
-        is_special = day_num in fridays_saturdays or day_num in sundays_mondays or day_num in saturdays_sundays or is_festival
+        is_weekend = day_num in weekends
+        is_special = is_weekend or is_festival
         
         # Festival: All H
         if is_festival:
@@ -280,7 +236,7 @@ def assign_shifts(employees, num_days, working_days, fridays_saturdays, sundays_
     return roster_dict
 
 # --- Generate Roster ---
-roster_dict = assign_shifts(employees, num_days, working_days_per_emp, fridays_saturdays, sundays_mondays, saturdays_sundays, festival_days, nightshift_exempt, friday_saturday_off, sunday_monday_off, saturday_sunday_off, leave_data)
+roster_dict = assign_shifts(employees, num_days, working_days_per_emp, weekends, festival_days, nightshift_exempt, weekend_exempt, leave_data)
 
 # --- Coverage Validation ---
 st.subheader("Coverage Check")
@@ -291,7 +247,7 @@ for day in range(num_days):
     g1_count = sum(1 for emp in employees if roster_dict[emp][day] == 'G1')
     n_count = sum(1 for emp in employees if roster_dict[emp][day] == 'N')
     s_count = sum(1 for emp in employees if roster_dict[emp][day] == 'S')
-    is_special = day_num in fridays_saturdays or day_num in sundays_mondays or day_num in saturdays_sundays or day_num in festival_days
+    is_special = day_num in weekends or day_num in festival_days
     min_fg1 = 4 if is_special else 3
     min_n = 3 if is_special else 2
     min_s = 2
@@ -326,7 +282,7 @@ else:
 
 # --- Color Coding ---
 def color_shifts(val):
-    colors = {'G1': 'limegreen', 'F': 'green', 'N': 'blue', 'S': 'lightgreen', 'O': 'red', 'L': 'yellow', 'H': 'orange', 'CO': 'purple'}
+    colors = {'G1': 'limegreen', 'F': 'green', 'N': 'blue', 'S': 'lightgreen', 'O': 'red', 'L': 'yellow', 'H': 'orange', 'CO': 'purple', 'E': 'pink'}
     return f'background-color: {colors.get(val, "")}'
 
 # --- Display Roster ---
@@ -336,7 +292,7 @@ st.dataframe(roster.style.applymap(color_shifts), height=600)
 
 # --- Shift Summary ---
 st.subheader("Shift Summary")
-summary_data = {shift: [sum(1 for s in roster_dict[emp] if s == shift) for emp in employees] for shift in ['G1', 'F', 'N', 'S', 'O', 'L', 'H', 'CO']}
+summary_data = {shift: [sum(1 for s in roster_dict[emp] if s == shift) for emp in employees] for shift in ['G1', 'F', 'N', 'S', 'O', 'L', 'H', 'CO', 'E']}
 summary = pd.DataFrame(summary_data, index=employees)
 st.dataframe(summary)
 
