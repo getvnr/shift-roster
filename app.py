@@ -19,7 +19,7 @@ employee_data = pd.DataFrame([
     ["Muppa Divya", 0, 20, 0, 0, 0, ""],  # Always Second shift
     ["Anil Athkuri", 0, 20, 0, 0, 0, ""],  # Always Second shift
     ["D Namithananda", 0, 20, 0, 0, 0, ""],  # Always Second shift
-    ["Srinivasu Cheedalla", 20, 0, 0, 0, 0, ""],  # Changed to General shift
+    ["Srinivasu Cheedalla", 0, 0, 20, 0, 0, ""],  # Always Night shift
     ["Gangavarapu Suneetha", 20, 0, 0, 0, 0, ""],  # Always General shift
     ["Lakshmi Narayana Rao", 20, 0, 0, 0, 0, ""],  # Always General shift
     ["Pousali C", 0, 20, 0, 0, 0, ""],
@@ -142,19 +142,19 @@ def generate_roster():
         "Muppa Divya": 'S',
         "Anil Athkuri": 'S',
         "D Namithananda": 'S',
-        "Srinivasu Cheedalla": 'G',  # Changed to General shift
+        "Srinivasu Cheedalla": 'N',
         "Gangavarapu Suneetha": 'G',
         "Lakshmi Narayana Rao": 'G'
     }
     
     # Hardcode provided roster for Group 1 and Group 2 (01-11-2025 to 28-11-2025)
     provided_roster = {
-        "Gopalakrishnan Selvaraj": ['O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'G', 'G', 'G', 'G', 'G'],
-        "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
-        "Rajesh Jayapalan": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
-        "Ajay Chidipotu": ['O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
-        "Imran Khan": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
-        "Sammeta Balachander": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G']
+        "Gopalakrishnan Selvaraj": ['O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M'],
+        "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
+        "Rajesh Jayapalan": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
+        "Ajay Chidipotu": ['O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
+        "Imran Khan": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
+        "Sammeta Balachander": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'M', 'M', 'M', 'M', 'M']
     }
     
     # Apply provided roster for Group 1 and Group 2
@@ -180,11 +180,11 @@ def generate_roster():
             roster[emp][day] = shift
     
     # Track shift counts
-    shift_counts = {emp: {'G': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0} for emp in employees}
+    shift_counts = {emp: {'M': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0} for emp in employees}
     for emp in employees:
         for day in range(num_days):
             shift = roster[emp][day]
-            if shift in ['G', 'S', 'N', 'M', 'E']:
+            if shift in ['M', 'S', 'N', 'M', 'E']:
                 shift_counts[emp][shift] += 1
     
     # Assign shifts for remaining employees
@@ -205,12 +205,12 @@ def generate_roster():
             G_req, S_req, N_req, M_req, E_req = 5, 5, 2, 0, 0
         
         # Count already assigned shifts
-        assigned_shifts = {'G': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0}
+        assigned_shifts = {'M': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0}
         for emp in employees:
             if roster[emp][day] in assigned_shifts:
                 assigned_shifts[roster[emp][day]] += 1
         
-        G_req -= assigned_shifts['G']
+        G_req -= assigned_shifts['M']
         S_req -= assigned_shifts['S']
         N_req -= assigned_shifts['N']
         M_req -= assigned_shifts['M']
@@ -237,9 +237,9 @@ def generate_roster():
         g_assigned = 0
         for emp in g_candidates:
             if g_assigned >= G_req: break
-            if shift_counts[emp]['G'] < employee_data.loc[employee_data['Name'] == emp, 'G_max'].iloc[0]:
-                roster[emp][day] = 'G'
-                shift_counts[emp]['G'] += 1
+            if shift_counts[emp]['M'] < employee_data.loc[employee_data['Name'] == emp, 'G_max'].iloc[0]:
+                roster[emp][day] = 'M'
+                shift_counts[emp]['M'] += 1
                 g_assigned += 1
                 available.remove(emp)
         
@@ -258,15 +258,7 @@ df_roster = pd.DataFrame(roster_dict, index=dates).T
 
 # --- Color Coding ---
 def color_shifts(val):
-    colors = {
-        'G': 'lightcoral',  # Color for General shift
-        'S': 'lightgreen', 
-        'N': 'lightblue', 
-        'M': 'yellow', 
-        'E': 'purple', 
-        'O': 'lightgray', 
-        'H': 'orange'
-    }
+    colors = {'M': 'green', 'S': 'lightgreen', 'N': 'lightblue', 'M': 'yellow', 'E': 'purple', 'O': 'lightgray', 'H': 'orange'}
     return f'background-color: {colors.get(val, "")}'
 st.subheader("Generated Roster")
 st.dataframe(df_roster.style.applymap(color_shifts), height=600)
@@ -275,10 +267,10 @@ st.dataframe(df_roster.style.applymap(color_shifts), height=600)
 st.subheader("Shift Summary")
 summary = pd.DataFrame({
     s: [sum(1 for v in roster_dict[e] if v == s) for e in employees]
-    for s in ['G', 'S', 'N', 'M', 'E', 'O', 'H']
+    for s in ['M', 'S', 'N', 'M', 'E', 'O', 'H']
 }, index=employees)
 st.dataframe(summary)
 
 # --- Download CSV ---
 csv = df_roster.to_csv().encode('utf-8')
-st.download_button("Download CSV", csv, f"roster_{year}_{month:02d}.csv")
+st.download_button("Download CSV", csv, f"roster_{year}_{month:02d}.csv") Srinivasu Cheedalla should also in G shift assign a colour to G also
