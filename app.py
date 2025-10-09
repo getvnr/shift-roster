@@ -44,13 +44,13 @@ nightshift_exempt = st.multiselect("Nightshift-Exempt Employees", employees, def
 
 # --- Weekoff Preferences ---
 st.subheader("Weekoff Preferences")
-friday_saturday_off = st.multiselect("Friday-Saturday Off", employees, default=[])
-sunday_monday_off = st.multiselect("Sunday-Monday Off", employees, default=[])
-saturday_sunday_off = st.multiselect("Saturday-Sunday Off", employees, default=[])
-tuesday_wednesday_off = st.multiselect("Tuesday-Wednesday Off", employees, default=[])
-thursday_friday_off = st.multiselect("Thursday-Friday Off", employees, default=[])
-wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, default=[])
-monday_tuesday_off = st.multiselect("Monday-Tuesday Off", employees, default=[])
+friday_saturday_off = st.multiselect("Friday-Saturday Off", employees, default=["Muppa Divya", "Anil Athkuri", "D Namithananda"])
+sunday_monday_off = st.multiselect("Sunday-Monday Off", employees, default=["Gangavarapu Suneetha", "Lakshmi Narayana Rao"])
+saturday_sunday_off = st.multiselect("Saturday-Sunday Off", employees, default=["Pousali C", "Thorat Yashwant"])
+tuesday_wednesday_off = st.multiselect("Tuesday-Wednesday Off", employees, default=["Srivastav Nitin", "Kishore Khati Vaibhav"])
+thursday_friday_off = st.multiselect("Thursday-Friday Off", employees, default=["Rupan Venkatesan Anandha", "Chaudhari Kaustubh"])
+wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, default=["Shejal Gawade", "Vivek Kushwaha"])
+monday_tuesday_off = st.multiselect("Monday-Tuesday Off", employees, default=["Abdul Mukthiyar Basha", "M Naveen"])
 
 # --- Validate Overlaps ---
 groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off, 
