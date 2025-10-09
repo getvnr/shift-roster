@@ -22,19 +22,19 @@ employee_data = pd.DataFrame([
     ["Srinivasu Cheedalla", 0, 0, 0, 0, 20, ""],  # Always Evening shift
     ["Gangavarapu Suneetha", 20, 0, 0, 0, 0, ""],  # Always General shift
     ["Lakshmi Narayana Rao", 20, 0, 0, 0, 0, ""],  # Always General shift
-    ["Pousali C", 0, 20, 0, 0, 0, ""],
-    ["Thorat Yashwant", 0, 20, 0, 0, 0, ""],
-    ["Srivastav Nitin", 0, 20, 0, 0, 0, ""],
-    ["Kishore Khati Vaibhav", 0, 20, 0, 0, 0, ""],
-    ["Rupan Venkatesan Anandha", 0, 20, 0, 0, 0, ""],
-    ["Chaudhari Kaustubh", 0, 20, 0, 0, 0, ""],
-    ["Shejal Gawade", 0, 20, 0, 0, 0, ""],
-    ["Vivek Kushwaha", 0, 20, 0, 0, 0, ""],
-    ["Abdul Mukthiyar Basha", 0, 20, 0, 0, 0, ""],
-    ["M Naveen", 0, 20, 0, 0, 0, ""],
-    ["B Madhurusha", 0, 20, 0, 0, 0, ""],
-    ["Chinthalapudi Yaswanth", 0, 20, 0, 0, 0, ""],
-    ["Edagotti Kalpana", 0, 20, 0, 0, 0, ""]
+    ["Pousali C", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Thorat Yashwant", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Srivastav Nitin", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Kishore Khati Vaibhav", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Rupan Venkatesan Anandha", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Chaudhari Kaustubh", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Shejal Gawade", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Vivek Kushwaha", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Abdul Mukthiyar Basha", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["M Naveen", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["B Madhurusha", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Chinthalapudi Yaswanth", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
+    ["Edagotti Kalpana", 10, 10, 5, 0, 0, ""]  # Max 5 Night shifts
 ], columns=["Name", "G_max", "S_max", "N_max", "M_max", "E_max", "Skill"])
 
 employees = employee_data["Name"].tolist()
@@ -134,7 +134,7 @@ def generate_roster():
 
     festival_set = set(festival_days)
     
-    # Define provided roster for all listed employees (01-11-2025 to 30-11-2025)
+    # Define provided roster for listed employees (01-11-2025 to 30-11-2025)
     provided_roster = {
         "Gopalakrishnan Selvaraj": ['O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O'],
         "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O'],
@@ -151,10 +151,16 @@ def generate_roster():
         "Lakshmi Narayana Rao": ['O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O']
     }
     
+    # Track shift counts to enforce maximums
+    shift_counts = {emp: {'G': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0} for emp in employees}
+    
     # Apply provided roster for listed employees
     for emp in provided_roster.keys():
         for day in range(num_days):
             roster[emp][day] = provided_roster[emp][day]
+            shift = roster[emp][day]
+            if shift in ['G', 'S', 'N', 'M', 'E']:
+                shift_counts[emp][shift] += 1
     
     # Assign shifts for remaining employees
     for day in range(num_days):
@@ -187,33 +193,35 @@ def generate_roster():
         
         available = [e for e in employees if roster[e][day] == '' and e not in provided_roster.keys()]
         
-        # Assign Night shifts
-        n_candidates = [e for e in available if e not in nightshift_exempt]
-        n_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'N_max'].values[0], reverse=True)
+        # Assign Night shifts (max 5 per employee)
+        n_candidates = [e for e in available if e not in nightshift_exempt and shift_counts[e]['N'] < employee_data.loc[employee_data['Name'] == e, 'N_max'].iloc[0]]
+        n_candidates.sort(key=lambda x: shift_counts[x]['N'])  # Prioritize employees with fewer night shifts
         n_assigned = 0
         for emp in n_candidates:
             if n_assigned >= N_req: break
             if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
-            if employee_data.loc[employee_data['Name'] == emp, 'N_max'].iloc[0] > 0:
-                roster[emp][day] = 'N'
-                n_assigned += 1
-                available.remove(emp)
+            roster[emp][day] = 'N'
+            shift_counts[emp]['N'] += 1
+            n_assigned += 1
+            available.remove(emp)
         
         # Assign General Shift
-        g_candidates = available.copy()
-        g_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'G_max'].values[0], reverse=True)
+        g_candidates = [e for e in available if shift_counts[e]['G'] < employee_data.loc[employee_data['Name'] == e, 'G_max'].iloc[0]]
+        g_candidates.sort(key=lambda x: shift_counts[x]['G'])
         g_assigned = 0
         for emp in g_candidates:
             if g_assigned >= G_req: break
-            if employee_data.loc[employee_data['Name'] == emp, 'G_max'].iloc[0] > 0:
-                roster[emp][day] = 'G'
-                g_assigned += 1
-                available.remove(emp)
+            roster[emp][day] = 'G'
+            shift_counts[emp]['G'] += 1
+            g_assigned += 1
+            available.remove(emp)
         
         # Assign Second Shift to remaining
-        for emp in available:
-            if S_req > 0 and employee_data.loc[employee_data['Name'] == emp, 'S_max'].iloc[0] > 0:
+        s_candidates = [e for e in available if shift_counts[e]['S'] < employee_data.loc[employee_data['Name'] == e, 'S_max'].iloc[0]]
+        for emp in s_candidates:
+            if S_req > 0:
                 roster[emp][day] = 'S'
+                shift_counts[emp]['S'] += 1
                 S_req -= 1
     
     return roster
