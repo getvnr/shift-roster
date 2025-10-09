@@ -130,11 +130,11 @@ def generate_roster():
     for emp in employees:
         off_idx = assign_off_days(emp, num_days)
         for idx in off_idx:
-            roster[emp][idx] = 'O'
+            roster[emp][day] = 'O'
 
     festival_set = set(festival_days)
     
-    # Define provided roster for listed employees (01-11-2025 to 30-11-2025)
+    # Define provided roster for listed employees (01-11-2025 to 30-11-2025, 30 days)
     provided_roster = {
         "Gopalakrishnan Selvaraj": ['O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O'],
         "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O'],
@@ -154,15 +154,37 @@ def generate_roster():
     # Track shift counts to enforce maximums
     shift_counts = {emp: {'G': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0} for emp in employees}
     
-    # Apply provided roster for listed employees
+    # Define fixed shift employees for fallback (used for days beyond provided roster or other months)
+    fixed_shift_employees = {
+        "Ramesh Polisetty": 'G',
+        "Muppa Divya": 'S',
+        "Anil Athkuri": 'S',
+        "D Namithananda": 'S',
+        "Srinivasu Cheedalla": 'E',
+        "Gangavarapu Suneetha": 'G',
+        "Lakshmi Narayana Rao": 'G'
+    }
+    
+    # Apply provided roster for listed employees, respecting month length
+    provided_roster_length = 30  # Length of provided roster (November 2025)
     for emp in provided_roster.keys():
         for day in range(num_days):
-            roster[emp][day] = provided_roster[emp][day]
-            shift = roster[emp][day]
-            if shift in ['G', 'S', 'N', 'M', 'E']:
-                shift_counts[emp][shift] += 1
+            if day < provided_roster_length and (year == 2025 and month == 11):
+                roster[emp][day] = provided_roster[emp][day]
+                shift = roster[emp][day]
+                if shift in ['G', 'S', 'N', 'M', 'E']:
+                    shift_counts[emp][shift] += 1
+            else:
+                # Fallback for days beyond provided roster or other months
+                if emp in fixed_shift_employees and day not in assign_off_days(emp, num_days):
+                    if emp not in nightshift_exempt or fixed_shift_employees[emp] != 'N':
+                        max_shifts = employee_data.loc[employee_data['Name'] == emp, ['G_max', 'S_max', 'N_max', 'M_max', 'E_max']].iloc[0]
+                        shift = fixed_shift_employees[emp]
+                        if shift_counts[emp][shift] < max_shifts[f"{shift}_max"]:
+                            roster[emp][day] = shift
+                            shift_counts[emp][shift] += 1
     
-    # Assign shifts for remaining employees
+    # Assign shifts for remaining employees and any unassigned days
     for day in range(num_days):
         day_num = day + 1
         if day_num in festival_set:
@@ -191,7 +213,7 @@ def generate_roster():
         M_req -= assigned_shifts['M']
         E_req -= assigned_shifts['E']
         
-        available = [e for e in employees if roster[e][day] == '' and e not in provided_roster.keys()]
+        available = [e for e in employees if roster[e][day] == '']
         
         # Assign Night shifts (max 5 per employee)
         n_candidates = [e for e in available if e not in nightshift_exempt and shift_counts[e]['N'] < employee_data.loc[employee_data['Name'] == e, 'N_max'].iloc[0]]
