@@ -102,7 +102,6 @@ st.write(f"Total Working Days (excluding weekends and festivals): {num_working_d
 # --- Off Days Assignment ---
 def assign_off_days(emp_name, num_days):
     off_days = []
-    # Override week-off preferences for employees with no-weekend requirement
     no_weekend_employees = [
         "Ramesh Polisetty", "Muppa Divya", "Anil Athkuri", "D Namithananda",
         "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao",
@@ -130,7 +129,7 @@ def generate_roster():
     for emp in employees:
         off_idx = assign_off_days(emp, num_days)
         for idx in off_idx:
-            roster[emp][day] = 'O'
+            roster[emp][idx] = 'O'
 
     festival_set = set(festival_days)
     
@@ -223,7 +222,7 @@ def generate_roster():
             if n_assigned >= N_req: break
             if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
             roster[emp][day] = 'N'
-            shift_counts[emp]['N'] += 1
+            shift_counts[emp][N] += 1
             n_assigned += 1
             available.remove(emp)
         
