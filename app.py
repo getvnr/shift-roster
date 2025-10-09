@@ -11,17 +11,17 @@ st.title("Automated 24/7 Shift Roster Generator (5-day blocks)")
 employee_data = pd.DataFrame([
     ["Gopalakrishnan Selvaraj", 5, 5, 10, "IIS"],
     ["Paneerselvam F", 5, 5, 10, "IIS"],
-    ["Rajesh Jayapalan", 5, 5, 5, "IIS"],  # One employee with 5 fewer night shifts
+    ["Rajesh Jayapalan", 5, 5, 5, "IIS"],
     ["Ajay Chidipotu", 5, 5, 10, "Websphere"],
-    ["Imran Khan", 5, 15, 0, "Websphere"],  # Updated for 5F, 15S, 0N
+    ["Imran Khan", 5, 15, 0, "Websphere"],
     ["Sammeta Balachander", 5, 5, 10, "Websphere"],
-    ["Ramesh Polisetty", 0, 20, 0, ""],
-    ["Muppa Divya", 0, 20, 0, ""],
-    ["Anil Athkuri", 0, 20, 0, ""],
-    ["D Namithananda", 0, 20, 0, ""],
-    ["Srinivasu Cheedalla", 0, 20, 0, ""],
-    ["Gangavarapu Suneetha", 0, 20, 0, ""],
-    ["Lakshmi Narayana Rao", 0, 20, 0, ""],
+    ["Ramesh Polisetty", 20, 0, 0, ""],  # Always First shift
+    ["Muppa Divya", 0, 20, 0, ""],  # Always Second shift
+    ["Anil Athkuri", 0, 20, 0, ""],  # Always Second shift
+    ["D Namithananda", 0, 20, 0, ""],  # Always Second shift
+    ["Srinivasu Cheedalla", 0, 0, 20, ""],  # Always Night shift
+    ["Gangavarapu Suneetha", 20, 0, 0, ""],  # Always First shift
+    ["Lakshmi Narayana Rao", 20, 0, 0, ""],  # Always First shift
     ["Pousali C", 0, 20, 0, ""],
     ["Thorat Yashwant", 0, 20, 0, ""],
     ["Srivastav Nitin", 0, 20, 0, ""],
@@ -102,13 +102,23 @@ st.write(f"Total Working Days (excluding weekends and festivals): {num_working_d
 # --- Off Days Assignment ---
 def assign_off_days(emp_name, num_days):
     off_days = []
-    if emp_name in friday_saturday_off: off_days += fridays_saturdays
-    if emp_name in sunday_monday_off: off_days += sundays_mondays
-    if emp_name in saturday_sunday_off: off_days += saturdays_sundays
-    if emp_name in tuesday_wednesday_off: off_days += tuesday_wednesday
-    if emp_name in thursday_friday_off: off_days += thursday_friday
-    if emp_name in wednesday_thursday_off: off_days += wednesday_thursday
-    if emp_name in monday_tuesday_off: off_days += monday_tuesday
+    # Override week-off preferences for employees with no-weekend requirement
+    no_weekend_employees = [
+        "Ramesh Polisetty", "Muppa Divya", "Anil Athkuri", "D Namithananda",
+        "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao",
+        "Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan",
+        "Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"
+    ]
+    if emp_name in no_weekend_employees:
+        off_days += saturdays_sundays
+    else:
+        if emp_name in friday_saturday_off: off_days += fridays_saturdays
+        if emp_name in sunday_monday_off: off_days += sundays_mondays
+        if emp_name in saturday_sunday_off: off_days += saturdays_sundays
+        if emp_name in tuesday_wednesday_off: off_days += tuesday_wednesday
+        if emp_name in thursday_friday_off: off_days += thursday_friday
+        if emp_name in wednesday_thursday_off: off_days += wednesday_thursday
+        if emp_name in monday_tuesday_off: off_days += monday_tuesday
     return set([d - 1 for d in off_days if d <= num_days])
 
 # --- Generate Roster ---
@@ -127,8 +137,17 @@ def generate_roster():
     # Define groups
     group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
     group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
+    fixed_shift_employees = {
+        "Ramesh Polisetty": 'F',
+        "Muppa Divya": 'S',
+        "Anil Athkuri": 'S',
+        "D Namithananda": 'S',
+        "Srinivasu Cheedalla": 'N',
+        "Gangavarapu Suneetha": 'F',
+        "Lakshmi Narayana Rao": 'F'
+    }
     
-    # Hardcode provided roster for 01-11-2025 to 28-11-2025
+    # Hardcode provided roster for Group 1 and Group 2 (01-11-2025 to 28-11-2025)
     provided_roster = {
         "Gopalakrishnan Selvaraj": ['O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
         "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
@@ -138,18 +157,29 @@ def generate_roster():
         "Sammeta Balachander": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'S', 'S', 'S', 'S', 'S']
     }
     
-    # Apply provided roster
+    # Apply provided roster for Group 1 and Group 2
     for emp in group1 + group2:
         for day in range(28):
             roster[emp][day] = provided_roster[emp][day]
     
-    # Assign weekend days (29-30 Nov) as Off
+    # Assign weekend days (29-30 Nov) as Off for Group 1, Group 2, and fixed-shift employees
     for day in range(28, num_days):
         if (day + 1) in saturdays_sundays:
-            for emp in group1 + group2:
+            for emp in group1 + group2 + list(fixed_shift_employees.keys()):
                 roster[emp][day] = 'O'
     
-    # Track shift counts to enforce quotas
+    # Assign fixed shifts for specified employees on working days
+    working_days = [d for d in range(num_days) if (d + 1) not in saturdays_sundays and (d + 1) not in festival_set]
+    for emp, shift in fixed_shift_employees.items():
+        for day in working_days:
+            if roster[emp][day] == 'O':  # Respect week-offs
+                continue
+            if emp in nightshift_exempt and shift == 'N':
+                continue
+            max_shifts = employee_data.loc[employee_data['Name'] == emp, ['F_max', 'S_max', 'N_max']].iloc[0]
+            roster[emp][day] = shift
+    
+    # Track shift counts
     shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}
     for emp in employees:
         for day in range(num_days):
@@ -168,13 +198,6 @@ def generate_roster():
         weekday_name = weekday(year, month, day_num)
         is_weekend = weekday_name >= 5
         
-        # Assign Off for group1 and group2 on weekends
-        if is_weekend:
-            for emp in group1 + group2:
-                if roster[emp][day] == '':
-                    roster[emp][day] = 'O'
-            continue
-        
         # Define required shifts
         if is_weekend:
             F_req, S_req, N_req = 3, 3, 2
@@ -191,7 +214,7 @@ def generate_roster():
         S_req -= assigned_shifts['S']
         N_req -= assigned_shifts['N']
         
-        available = [e for e in employees if roster[e][day] == '' and e not in group1 + group2]
+        available = [e for e in employees if roster[e][day] == '' and e not in group1 + group2 + list(fixed_shift_employees.keys())]
         
         # Assign Night shifts
         n_candidates = [e for e in available if e not in nightshift_exempt]
