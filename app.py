@@ -273,4 +273,4 @@ st.dataframe(summary)
 
 # --- Download CSV ---
 csv = df_roster.to_csv().encode('utf-8')
-st.download_button("Download CSV", csv, f"roster_{year}_{month:02d}.csv") Srinivasu Cheedalla should also in G shift assign a colour to G also
+st.download_button("Download CSV", csv, f"roster_{year}_{month:02d}.csv") 
