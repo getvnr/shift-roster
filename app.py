@@ -19,7 +19,7 @@ employee_data = pd.DataFrame([
     ["Muppa Divya", 0, 20, 0, 0, 0, ""],  # Always Second shift
     ["Anil Athkuri", 0, 20, 0, 0, 0, ""],  # Always Second shift
     ["D Namithananda", 0, 20, 0, 0, 0, ""],  # Always Second shift
-    ["Srinivasu Cheedalla", 0, 0, 20, 0, 0, ""],  # Always Night shift
+    ["Srinivasu Cheedalla", 0, 0, 0, 0, 20, ""],  # Always Evening shift
     ["Gangavarapu Suneetha", 20, 0, 0, 0, 0, ""],  # Always General shift
     ["Lakshmi Narayana Rao", 20, 0, 0, 0, 0, ""],  # Always General shift
     ["Pousali C", 0, 20, 0, 0, 0, ""],
@@ -134,58 +134,27 @@ def generate_roster():
 
     festival_set = set(festival_days)
     
-    # Define groups
-    group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-    group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
-    fixed_shift_employees = {
-        "Ramesh Polisetty": 'G',
-        "Muppa Divya": 'S',
-        "Anil Athkuri": 'S',
-        "D Namithananda": 'S',
-        "Srinivasu Cheedalla": 'N',
-        "Gangavarapu Suneetha": 'G',
-        "Lakshmi Narayana Rao": 'G'
-    }
-    
-    # Hardcode provided roster for Group 1 and Group 2 (01-11-2025 to 28-11-2025)
+    # Define provided roster for all listed employees (01-11-2025 to 30-11-2025)
     provided_roster = {
-        "Gopalakrishnan Selvaraj": ['O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M'],
-        "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
-        "Rajesh Jayapalan": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
-        "Ajay Chidipotu": ['O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
-        "Imran Khan": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
-        "Sammeta Balachander": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'M', 'M', 'M', 'M', 'M']
+        "Gopalakrishnan Selvaraj": ['O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O'],
+        "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O'],
+        "Rajesh Jayapalan": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O'],
+        "Ajay Chidipotu": ['O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O'],
+        "Imran Khan": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O'],
+        "Sammeta Balachander": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O', 'M', 'M', 'M', 'M', 'M', 'O', 'O'],
+        "Ramesh Polisetty": ['O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O'],
+        "Muppa Divya": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O'],
+        "Anil Athkuri": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O'],
+        "D Namithananda": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O'],
+        "Srinivasu Cheedalla": ['O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O'],
+        "Gangavarapu Suneetha": ['O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O'],
+        "Lakshmi Narayana Rao": ['O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O']
     }
     
-    # Apply provided roster for Group 1 and Group 2
-    for emp in group1 + group2:
-        for day in range(28):
-            roster[emp][day] = provided_roster[emp][day]
-    
-    # Assign weekend days (29-30 Nov) as Off for Group 1, Group 2, and fixed-shift employees
-    for day in range(28, num_days):
-        if (day + 1) in saturdays_sundays:
-            for emp in group1 + group2 + list(fixed_shift_employees.keys()):
-                roster[emp][day] = 'O'
-    
-    # Assign fixed shifts for specified employees on working days
-    working_days = [d for d in range(num_days) if (d + 1) not in saturdays_sundays and (d + 1) not in festival_set]
-    for emp, shift in fixed_shift_employees.items():
-        for day in working_days:
-            if roster[emp][day] == 'O':  # Respect week-offs
-                continue
-            if emp in nightshift_exempt and shift == 'N':
-                continue
-            max_shifts = employee_data.loc[employee_data['Name'] == emp, ['G_max', 'S_max', 'N_max', 'M_max', 'E_max']].iloc[0]
-            roster[emp][day] = shift
-    
-    # Track shift counts
-    shift_counts = {emp: {'M': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0} for emp in employees}
-    for emp in employees:
+    # Apply provided roster for listed employees
+    for emp in provided_roster.keys():
         for day in range(num_days):
-            shift = roster[emp][day]
-            if shift in ['M', 'S', 'N', 'M', 'E']:
-                shift_counts[emp][shift] += 1
+            roster[emp][day] = provided_roster[emp][day]
     
     # Assign shifts for remaining employees
     for day in range(num_days):
@@ -205,18 +174,18 @@ def generate_roster():
             G_req, S_req, N_req, M_req, E_req = 5, 5, 2, 0, 0
         
         # Count already assigned shifts
-        assigned_shifts = {'M': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0}
+        assigned_shifts = {'G': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0}
         for emp in employees:
             if roster[emp][day] in assigned_shifts:
                 assigned_shifts[roster[emp][day]] += 1
         
-        G_req -= assigned_shifts['M']
+        G_req -= assigned_shifts['G']
         S_req -= assigned_shifts['S']
         N_req -= assigned_shifts['N']
         M_req -= assigned_shifts['M']
         E_req -= assigned_shifts['E']
         
-        available = [e for e in employees if roster[e][day] == '' and e not in group1 + group2 + list(fixed_shift_employees.keys())]
+        available = [e for e in employees if roster[e][day] == '' and e not in provided_roster.keys()]
         
         # Assign Night shifts
         n_candidates = [e for e in available if e not in nightshift_exempt]
@@ -225,9 +194,8 @@ def generate_roster():
         for emp in n_candidates:
             if n_assigned >= N_req: break
             if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
-            if shift_counts[emp]['N'] < employee_data.loc[employee_data['Name'] == emp, 'N_max'].iloc[0]:
+            if employee_data.loc[employee_data['Name'] == emp, 'N_max'].iloc[0] > 0:
                 roster[emp][day] = 'N'
-                shift_counts[emp]['N'] += 1
                 n_assigned += 1
                 available.remove(emp)
         
@@ -237,17 +205,15 @@ def generate_roster():
         g_assigned = 0
         for emp in g_candidates:
             if g_assigned >= G_req: break
-            if shift_counts[emp]['M'] < employee_data.loc[employee_data['Name'] == emp, 'G_max'].iloc[0]:
-                roster[emp][day] = 'M'
-                shift_counts[emp]['M'] += 1
+            if employee_data.loc[employee_data['Name'] == emp, 'G_max'].iloc[0] > 0:
+                roster[emp][day] = 'G'
                 g_assigned += 1
                 available.remove(emp)
         
         # Assign Second Shift to remaining
         for emp in available:
-            if S_req > 0 and shift_counts[emp]['S'] < employee_data.loc[employee_data['Name'] == emp, 'S_max'].iloc[0]:
+            if S_req > 0 and employee_data.loc[employee_data['Name'] == emp, 'S_max'].iloc[0] > 0:
                 roster[emp][day] = 'S'
-                shift_counts[emp]['S'] += 1
                 S_req -= 1
     
     return roster
@@ -258,8 +224,17 @@ df_roster = pd.DataFrame(roster_dict, index=dates).T
 
 # --- Color Coding ---
 def color_shifts(val):
-    colors = {'M': 'green', 'S': 'lightgreen', 'N': 'lightblue', 'M': 'yellow', 'E': 'purple', 'O': 'lightgray', 'H': 'orange'}
+    colors = {
+        'G': 'lightcoral',  # General shift
+        'S': 'lightgreen',  # Second shift
+        'N': 'lightblue',   # Night shift
+        'M': 'yellow',      # Morning shift
+        'E': 'purple',      # Evening shift
+        'O': 'lightgray',   # Off
+        'H': 'orange'       # Holiday
+    }
     return f'background-color: {colors.get(val, "")}'
+
 st.subheader("Generated Roster")
 st.dataframe(df_roster.style.applymap(color_shifts), height=600)
 
@@ -267,10 +242,10 @@ st.dataframe(df_roster.style.applymap(color_shifts), height=600)
 st.subheader("Shift Summary")
 summary = pd.DataFrame({
     s: [sum(1 for v in roster_dict[e] if v == s) for e in employees]
-    for s in ['M', 'S', 'N', 'M', 'E', 'O', 'H']
+    for s in ['G', 'S', 'N', 'M', 'E', 'O', 'H']
 }, index=employees)
 st.dataframe(summary)
 
 # --- Download CSV ---
 csv = df_roster.to_csv().encode('utf-8')
-st.download_button("Download CSV", csv, f"roster_{year}_{month:02d}.csv") 
+st.download_button("Download CSV", csv, f"roster_{year}_{month:02d}.csv")
