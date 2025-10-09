@@ -235,7 +235,7 @@ def generate_roster():
         g_assigned = 0
         for emp in g_candidates:
             if g_assigned >= G_req: break
-            if shift_counts[emp]['G'] < employee_data.loc[employee_data['Name'] == x, 'G_max'].iloc[0]:
+            if shift_counts[emp]['G'] < employee_data.loc[employee_data['Name'] == emp, 'G_max'].iloc[0]:
                 roster[emp][day] = 'G'
                 shift_counts[emp]['G'] += 1
                 g_assigned += 1
