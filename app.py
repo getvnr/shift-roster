@@ -190,7 +190,7 @@ def generate_roster():
         # Count already assigned shifts
         assigned_shifts = {'F': 0, 'S': 0, 'N': 0}
         for emp in employees:
-            if roster[emp][daymw in assigned_shifts:
+            if roster[emp][day] in assigned_shifts:
                 assigned_shifts[roster[emp][day]] += 1
         
         F_req -= assigned_shifts['F']
