@@ -40,7 +40,7 @@ employee_data = pd.DataFrame([
 employees = employee_data["Name"].tolist()
 
 # --- Nightshift Exempt ---
-nightshift_exempt = st.multiselect("Nightshift-Exempt Employees", employees, default=["Ramesh Polisetty", "Srinivasu Cheedalla", "Imran Khan"])  # Added Imran Khan
+nightshift_exempt = st.multiselect("Nightshift-Exempt Employees", employees, default=["Ramesh Polisetty", "Srinivasu Cheedalla", "Imran Khan"])
 
 # --- Weekoff Preferences ---
 st.subheader("Weekoff Preferences")
@@ -76,7 +76,7 @@ festival_days = st.multiselect("Festival Days", list(range(1, num_days + 1)), de
 def get_weekdays(year, month, weekday_indices):
     return [d for d in range(1, monthrange(year, month)[1] + 1) if weekday(year, month, d) in weekday_indices]
 
-# Calculate weekdays for week-off preferences
+# Calculate weekdays for week-off preferences and weekend counts
 fridays_saturdays = get_weekdays(year, month, [4, 5])  # Friday=4, Saturday=5
 sundays_mondays = get_weekdays(year, month, [6, 0])    # Sunday=6, Monday=0
 saturdays_sundays = get_weekdays(year, month, [5, 6])  # Saturday=5, Sunday=6
@@ -84,6 +84,20 @@ tuesday_wednesday = get_weekdays(year, month, [1, 2])  # Tuesday=1, Wednesday=2
 thursday_friday = get_weekdays(year, month, [3, 4])    # Thursday=3, Friday=4
 wednesday_thursday = get_weekdays(year, month, [2, 3]) # Wednesday=2, Thursday=3
 monday_tuesday = get_weekdays(year, month, [0, 1])     # Monday=0, Tuesday=1
+
+# Calculate Saturdays and Sundays
+saturdays = get_weekdays(year, month, [5])
+sundays = get_weekdays(year, month, [6])
+num_saturdays = len(saturdays)
+num_sundays = len(sundays)
+num_weekends = num_saturdays + num_sundays
+num_working_days = num_days - num_weekends - len(festival_days)
+
+# Display weekend and working days information
+st.subheader("Month Summary")
+st.write(f"Number of Saturdays: {num_saturdays}")
+st.write(f"Number of Sundays: {num_sundays}")
+st.write(f"Total Working Days (excluding weekends and festivals): {num_working_days}")
 
 # --- Off Days Assignment ---
 def assign_off_days(emp_name, num_days):
@@ -117,7 +131,39 @@ def generate_roster():
     # Track shift counts to enforce quotas
     shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}
     
-    # Assign shifts for each day
+    # Get working days (excluding weekends and festivals)
+    working_days = [d for d in range(num_days) if (d + 1) not in saturdays_sundays and (d + 1) not in festival_set]
+    
+    # Assign 5-day blocks for group1 and group2
+    for group, shift_options in [(group1, [('F', 'S', 'N'), ('S', 'N', 'F'), ('N', 'F', 'S')]), 
+                                (group2, [('F', 'S', 'N'), ('S', 'F', 'N'), ('N', 'S', 'F')])]:
+        block_start = 0
+        block_idx = 0
+        while block_start < len(working_days):
+            # Determine the shift combination for this block
+            shift_choice = shift_options[block_idx % len(shift_options)]
+            block_idx += 1
+            
+            # Assign shifts for 5 consecutive working days
+            for i in range(5):
+                if block_start + i >= len(working_days):
+                    break
+                day = working_days[block_start + i]
+                
+                for j, emp in enumerate(group):
+                    if roster[emp][day] == 'O':  # Respect week-offs
+                        continue
+                    shift = shift_choice[j]
+                    if emp in nightshift_exempt and shift == 'N':
+                        continue
+                    max_shifts = employee_data.loc[employee_data['Name'] == emp, ['F_max', 'S_max', 'N_max']].iloc[0]
+                    if shift_counts[emp][shift] < max_shifts[shift + '_max']:
+                        roster[emp][day] = shift
+                        shift_counts[emp][shift] += 1
+            
+            block_start += 5
+    
+    # Assign shifts for remaining employees
     for day in range(num_days):
         day_num = day + 1
         if day_num in festival_set:
@@ -135,67 +181,23 @@ def generate_roster():
                     roster[emp][day] = 'O'
             continue
         
-        # Assign shifts for group1 (opposite shifts, 5F/5S/10N, one with 5N)
-        available_group1 = [e for e in group1 if roster[e][day] == '']
-        if available_group1:
-            # Define possible shift combinations ensuring opposite shifts
-            shift_options = [('F', 'S', 'N'), ('S', 'N', 'F'), ('N', 'F', 'S')]
-            shift_choice = shift_options[day % 3]
-            
-            for i, emp in enumerate(available_group1):
-                shift = shift_choice[i]
-                if emp in nightshift_exempt and shift == 'N':
-                    continue
-                # Check shift limits
-                max_shifts = employee_data.loc[employee_data['Name'] == emp, ['F_max', 'S_max', 'N_max']].iloc[0]
-                if shift_counts[emp][shift] < max_shifts[shift + '_max']:
-                    roster[emp][day] = shift
-                    shift_counts[emp][shift] += 1
-        
-        # Assign shifts for group2 (opposite shifts, Imran: 5F/15S/0N, others: 5F/5S/10N)
-        available_group2 = [e for e in group2 if roster[e][day] == '']
-        if available_group2:
-            # Prioritize Imran for S if possible, else F
-            imran = "Imran Khan"
-            if imran in available_group2 and shift_counts[imran]['S'] < 15:
-                roster[imran][day] = 'S'
-                shift_counts[imran]['S'] += 1
-                available_group2.remove(imran)
-            elif imran in available_group2 and shift_counts[imran]['F'] < 5:
-                roster[imran][day] = 'F'
-                shift_counts[imran]['F'] += 1
-                available_group2.remove(imran)
-            
-            # Assign opposite shifts for remaining in group2
-            if len(available_group2) == 2:
-                shift_options = [('F', 'N'), ('N', 'F')]
-                shift_choice = shift_options[day % 2]
-                for i, emp in enumerate(available_group2):
-                    shift = shift_choice[i]
-                    if emp in nightshift_exempt and shift == 'N':
-                        continue
-                    max_shifts = employee_data.loc[employee_data['Name'] == emp, ['F_max', 'S_max', 'N_max']].iloc[0]
-                    if shift_counts[emp][shift] < max_shifts[shift + '_max']:
-                        roster[emp][day] = shift
-                        shift_counts[emp][shift] += 1
-        
-        # Assign shifts for remaining employees
-        available = [e for e in employees if roster[e][day] == '' and e not in group1 + group2]
-        
-        # Define required shifts (adjust for already assigned)
+        # Define required shifts
         if is_weekend:
             F_req, S_req, N_req = 3, 3, 2
         else:
             F_req, S_req, N_req = 5, 5, 2
         
+        # Count already assigned shifts
         assigned_shifts = {'F': 0, 'S': 0, 'N': 0}
         for emp in employees:
-            if roster[emp][day] in assigned_shifts:
+            if roster[emp][daymw in assigned_shifts:
                 assigned_shifts[roster[emp][day]] += 1
         
         F_req -= assigned_shifts['F']
         S_req -= assigned_shifts['S']
         N_req -= assigned_shifts['N']
+        
+        available = [e for e in employees if roster[e][day] == '' and e not in group1 + group2]
         
         # Assign Night shifts
         n_candidates = [e for e in available if e not in nightshift_exempt]
