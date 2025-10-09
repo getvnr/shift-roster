@@ -226,7 +226,7 @@ def generate_roster():
             available.remove(emp)
         
         # Assign Second Shift to remaining
-        s_candidates = [e for e in available if shift_counts[e]['S'] < employee_data personally.loc[employee_data['Name'] == e, 'S_max'].iloc[0]]
+        s_candidates = [e for e in available if shift_counts[e]['S'] < employee_data.loc[employee_data['Name'] == e, 'S_max'].iloc[0]]
         for emp in s_candidates:
             if S_req > 0:
                 roster[emp][day] = 'S'
