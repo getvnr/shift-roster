@@ -15,13 +15,13 @@ employee_data = pd.DataFrame([
     ["Ajay Chidipotu", 5, 5, 10, "Websphere"],
     ["Imran Khan", 5, 15, 0, "Websphere"],
     ["Sammeta Balachander", 5, 5, 10, "Websphere"],
-    ["Ramesh Polisetty", 20, 0, 0, ""],  # Always First shift
+    ["Ramesh Polisetty", 20, 0, 0, ""],  # Always General shift
     ["Muppa Divya", 0, 20, 0, ""],  # Always Second shift
     ["Anil Athkuri", 0, 20, 0, ""],  # Always Second shift
     ["D Namithananda", 0, 20, 0, ""],  # Always Second shift
-    ["Srinivasu Cheedalla", 0, 0, 20, ""],  # Always Night shift
-    ["Gangavarapu Suneetha", 20, 0, 0, ""],  # Always First shift
-    ["Lakshmi Narayana Rao", 20, 0, 0, ""],  # Always First shift
+    ["Srinivasu Cheedalla", 0, 0, 20, ""],  # Always Evening shift
+    ["Gangavarapu Suneetha", 20, 0, 0, ""],  # Always General shift
+    ["Lakshmi Narayana Rao", 20, 0, 0, ""],  # Always General shift
     ["Pousali C", 0, 20, 0, ""],
     ["Thorat Yashwant", 0, 20, 0, ""],
     ["Srivastav Nitin", 0, 20, 0, ""],
@@ -35,12 +35,12 @@ employee_data = pd.DataFrame([
     ["B Madhurusha", 0, 20, 0, ""],
     ["Chinthalapudi Yaswanth", 0, 20, 0, ""],
     ["Edagotti Kalpana", 0, 20, 0, ""]
-], columns=["Name", "F_max", "S_max", "N_max", "Skill"])
+], columns=["Name", "G_max", "S_max", "E_max", "Skill"])
 
 employees = employee_data["Name"].tolist()
 
-# --- Nightshift Exempt ---
-nightshift_exempt = st.multiselect("Nightshift-Exempt Employees", employees, default=["Ramesh Polisetty", "Srinivasu Cheedalla", "Imran Khan"])
+# --- Evening Shift Exempt ---
+evening_shift_exempt = st.multiselect("Evening Shift-Exempt Employees", employees, default=["Ramesh Polisetty", "Srinivasu Cheedalla", "Imran Khan"])
 
 # --- Weekoff Preferences ---
 st.subheader("Weekoff Preferences")
@@ -138,23 +138,23 @@ def generate_roster():
     group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
     group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
     fixed_shift_employees = {
-        "Ramesh Polisetty": 'F',
+        "Ramesh Polisetty": 'G',
         "Muppa Divya": 'S',
         "Anil Athkuri": 'S',
         "D Namithananda": 'S',
-        "Srinivasu Cheedalla": 'N',
-        "Gangavarapu Suneetha": 'F',
-        "Lakshmi Narayana Rao": 'F'
+        "Srinivasu Cheedalla": 'E',
+        "Gangavarapu Suneetha": 'G',
+        "Lakshmi Narayana Rao": 'G'
     }
     
     # Hardcode provided roster for Group 1 and Group 2 (01-11-2025 to 28-11-2025)
     provided_roster = {
-        "Gopalakrishnan Selvaraj": ['O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
-        "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
-        "Rajesh Jayapalan": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
-        "Ajay Chidipotu": ['O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N'],
-        "Imran Khan": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
-        "Sammeta Balachander": ['O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'N', 'N', 'N', 'N', 'N', 'O', 'O', 'F', 'F', 'F', 'F', 'F', 'O', 'O', 'S', 'S', 'S', 'S', 'S']
+        "Gopalakrishnan Selvaraj": ['O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'E', 'E', 'E', 'E', 'E'],
+        "Paneerselvam F": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'E', 'E', 'E', 'E', 'E'],
+        "Rajesh Jayapalan": ['O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
+        "Ajay Chidipotu": ['O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'E', 'E', 'E', 'E', 'E'],
+        "Imran Khan": ['O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S', 'O', 'O', 'S', 'S', 'S', 'S', 'S'],
+        "Sammeta Balachander": ['O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'E', 'E', 'E', 'E', 'E', 'O', 'O', 'G', 'G', 'G', 'G', 'G', 'O', 'O', 'S', 'S', 'S', 'S', 'S']
     }
     
     # Apply provided roster for Group 1 and Group 2
@@ -174,17 +174,17 @@ def generate_roster():
         for day in working_days:
             if roster[emp][day] == 'O':  # Respect week-offs
                 continue
-            if emp in nightshift_exempt and shift == 'N':
+            if emp in evening_shift_exempt and shift == 'E':
                 continue
-            max_shifts = employee_data.loc[employee_data['Name'] == emp, ['F_max', 'S_max', 'N_max']].iloc[0]
+            max_shifts = employee_data.loc[employee_data['Name'] == emp, ['G_max', 'S_max', 'E_max']].iloc[0]
             roster[emp][day] = shift
     
     # Track shift counts
-    shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in employees}
+    shift_counts = {emp: {'G': 0, 'S': 0, 'E': 0} for emp in employees}
     for emp in employees:
         for day in range(num_days):
             shift = roster[emp][day]
-            if shift in ['F', 'S', 'N']:
+            if shift in ['G', 'S', 'E']:
                 shift_counts[emp][shift] += 1
     
     # Assign shifts for remaining employees
@@ -200,45 +200,45 @@ def generate_roster():
         
         # Define required shifts
         if is_weekend:
-            F_req, S_req, N_req = 3, 3, 2
+            G_req, S_req, E_req = 3, 3, 2
         else:
-            F_req, S_req, N_req = 5, 5, 2
+            G_req, S_req, E_req = 5, 5, 2
         
         # Count already assigned shifts
-        assigned_shifts = {'F': 0, 'S': 0, 'N': 0}
+        assigned_shifts = {'G': 0, 'S': 0, 'E': 0}
         for emp in employees:
             if roster[emp][day] in assigned_shifts:
                 assigned_shifts[roster[emp][day]] += 1
         
-        F_req -= assigned_shifts['F']
+        G_req -= assigned_shifts['G']
         S_req -= assigned_shifts['S']
-        N_req -= assigned_shifts['N']
+        E_req -= assigned_shifts['E']
         
         available = [e for e in employees if roster[e][day] == '' and e not in group1 + group2 + list(fixed_shift_employees.keys())]
         
-        # Assign Night shifts
-        n_candidates = [e for e in available if e not in nightshift_exempt]
-        n_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'N_max'].values[0], reverse=True)
-        n_assigned = 0
-        for emp in n_candidates:
-            if n_assigned >= N_req: break
-            if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
-            if shift_counts[emp]['N'] < employee_data.loc[employee_data['Name'] == emp, 'N_max'].iloc[0]:
-                roster[emp][day] = 'N'
-                shift_counts[emp]['N'] += 1
-                n_assigned += 1
+        # Assign Evening shifts
+        e_candidates = [e for e in available if e not in evening_shift_exempt]
+        e_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'E_max'].values[0], reverse=True)
+        e_assigned = 0
+        for emp in e_candidates:
+            if e_assigned >= E_req: break
+            if day >= 5 and all(roster[emp][day - 5 + p] == 'E' for p in range(5)): continue
+            if shift_counts[emp]['E'] < employee_data.loc[employee_data['Name'] == emp, 'E_max'].iloc[0]:
+                roster[emp][day] = 'E'
+                shift_counts[emp]['E'] += 1
+                e_assigned += 1
                 available.remove(emp)
         
-        # Assign First Shift
-        f_candidates = available.copy()
-        f_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'F_max'].values[0], reverse=True)
-        f_assigned = 0
-        for emp in f_candidates:
-            if f_assigned >= F_req: break
-            if shift_counts[emp]['F'] < employee_data.loc[employee_data['Name'] == emp, 'F_max'].iloc[0]:
-                roster[emp][day] = 'F'
-                shift_counts[emp]['F'] += 1
-                f_assigned += 1
+        # Assign General Shift
+        g_candidates = available.copy()
+        g_candidates.sort(key=lambda x: employee_data.loc[employee_data['Name'] == x, 'G_max'].values[0], reverse=True)
+        g_assigned = 0
+        for emp in g_candidates:
+            if g_assigned >= G_req: break
+            if shift_counts[emp]['G'] < employee_data.loc[employee_data['Name'] == x, 'G_max'].iloc[0]:
+                roster[emp][day] = 'G'
+                shift_counts[emp]['G'] += 1
+                g_assigned += 1
                 available.remove(emp)
         
         # Assign Second Shift to remaining
@@ -256,7 +256,7 @@ df_roster = pd.DataFrame(roster_dict, index=dates).T
 
 # --- Color Coding ---
 def color_shifts(val):
-    colors = {'F': 'green', 'S': 'lightgreen', 'N': 'lightblue', 'O': 'lightgray', 'H': 'orange'}
+    colors = {'G': 'green', 'S': 'lightgreen', 'E': 'lightblue', 'O': 'lightgray', 'H': 'orange'}
     return f'background-color: {colors.get(val, "")}'
 st.subheader("Generated Roster")
 st.dataframe(df_roster.style.applymap(color_shifts), height=600)
@@ -265,7 +265,7 @@ st.dataframe(df_roster.style.applymap(color_shifts), height=600)
 st.subheader("Shift Summary")
 summary = pd.DataFrame({
     s: [sum(1 for v in roster_dict[e] if v == s) for e in employees]
-    for s in ['F', 'S', 'N', 'O', 'H']
+    for s in ['G', 'S', 'E', 'O', 'H']
 }, index=employees)
 st.dataframe(summary)
 
