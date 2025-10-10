@@ -9,19 +9,19 @@ st.title("Automated 24/7 Shift Roster Generator (5-day blocks)")
 
 # --- Default Employees and Shift Limits ---
 employee_data = pd.DataFrame([
-    ["Gopalakrishnan Selvaraj", 5, 5, 10, 5, 5, "IIS"],
-    ["Paneerselvam F", 5, 5, 10, 5, 5, "IIS"],
-    ["Rajesh Jayapalan", 5, 5, 5, 5, 5, "IIS"],
-    ["Ajay Chidipotu", 5, 5, 10, 5, 5, "Websphere"],
-    ["Imran Khan", 5, 15, 0, 5, 5, "Websphere"],
-    ["Sammeta Balachander", 5, 5, 10, 5, 5, "Websphere"],
-    ["Ramesh Polisetty", 20, 0, 0, 0, 0, ""],  # Always General shift
-    ["Muppa Divya", 0, 20, 0, 0, 0, ""],  # Always Second shift
-    ["Anil Athkuri", 0, 20, 0, 0, 0, ""],  # Always Second shift
-    ["D Namithananda", 0, 20, 0, 0, 0, ""],  # Always Second shift
-    ["Srinivasu Cheedalla", 0, 0, 0, 0, 20, ""],  # Always Evening shift
-    ["Gangavarapu Suneetha", 20, 0, 0, 0, 0, ""],  # Always General shift
-    ["Lakshmi Narayana Rao", 20, 0, 0, 0, 0, ""],  # Always General shift
+    ["Gopalakrishnan Selvaraj", 10, 10, 10, 10, 5, "IIS"],
+    ["Paneerselvam F", 10, 10, 10, 10, 5, "IIS"],
+    ["Rajesh Jayapalan", 10, 10, 5, 10, 5, "IIS"],
+    ["Ajay Chidipotu", 10, 10, 10, 10, 5, "Websphere"],
+    ["Imran Khan", 10, 20, 0, 10, 5, "Websphere"],
+    ["Sammeta Balachander", 10, 10, 10, 10, 5, "Websphere"],
+    ["Ramesh Polisetty", 25, 0, 0, 0, 0, ""],  # Always General shift
+    ["Muppa Divya", 0, 25, 0, 0, 0, ""],  # Always Second shift
+    ["Anil Athkuri", 0, 25, 0, 0, 0, ""],  # Always Second shift
+    ["D Namithananda", 0, 25, 0, 0, 0, ""],  # Always Second shift
+    ["Srinivasu Cheedalla", 0, 0, 0, 0, 25, ""],  # Always Evening shift
+    ["Gangavarapu Suneetha", 25, 0, 0, 0, 0, ""],  # Always General shift
+    ["Lakshmi Narayana Rao", 25, 0, 0, 0, 0, ""],  # Always General shift
     ["Pousali C", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
     ["Thorat Yashwant", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
     ["Srivastav Nitin", 10, 10, 5, 0, 0, ""],  # Max 5 Night shifts
@@ -65,7 +65,7 @@ for i in range(len(groups)):
 
 # --- Month & Year ---
 year = st.number_input("Year", min_value=2023, max_value=2100, value=2025)
-month = st.selectbox("Month", list(range(1, 13)), index=10, format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
+month = st.selectbox("Month", list(range(1, 13)), index=11, format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
 num_days = monthrange(year, month)[1]
 dates = [f"{day:02d}-{month:02d}-{year}" for day in range(1, num_days + 1)]
 
@@ -133,14 +133,14 @@ def generate_roster():
 
     festival_set = set([d - 1 for d in festival_days])
     
-    # Define shift patterns for employees with rotating shifts
+    # Define shift patterns for employees with rotating shifts (based on December 2025)
     rotating_shift_employees = {
-        "Gopalakrishnan Selvaraj": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'M', 'M', 'M', 'M', 'M'],
-        "Paneerselvam F": ['S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'M', 'M', 'M', 'M', 'M', 'N', 'N', 'N', 'N', 'N'],
-        "Rajesh Jayapalan": ['N', 'N', 'N', 'N', 'N', 'M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
-        "Ajay Chidipotu": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N'],
-        "Imran Khan": ['S', 'S', 'S', 'S', 'S', 'M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
-        "Sammeta Balachander": ['N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'M', 'M', 'M', 'M', 'M', 'M', 'M', 'M', 'M', 'M']
+        "Gopalakrishnan Selvaraj": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'N', 'N', 'G', 'G', 'G', 'S', 'S', 'G', 'N'],
+        "Paneerselvam F": ['S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'M', 'M', 'N', 'N', 'N', 'G', 'G', 'N', 'M'],
+        "Rajesh Jayapalan": ['N', 'N', 'N', 'N', 'N', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'G', 'G', 'G', 'M', 'G'],
+        "Ajay Chidipotu": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'G', 'G', 'S', 'N'],
+        "Imran Khan": ['S', 'S', 'S', 'S', 'S', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'S', 'G', 'M', 'G'],
+        "Sammeta Balachander": ['N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'M', 'M', 'M', 'G', 'G', 'S', 'S', 'G', 'S']
     }
     
     # Define fixed shift employees
@@ -162,15 +162,20 @@ def generate_roster():
     for emp in listed_employees:
         pattern = rotating_shift_employees.get(emp, [fixed_shift_employees.get(emp)])
         pattern_length = len(pattern)
-        for day in range(num_days):
-            if day in assign_off_days(emp, num_days) or day in festival_set:
-                roster[emp][day] = 'O' if day not in festival_set else 'H'
-                continue
-            # Apply pattern cyclically
-            shift = pattern[day % pattern_length]
+        working_days = [d for d in range(num_days) if d not in assign_off_days(emp, num_days) and d not in festival_set]
+        for i, day in enumerate(working_days):
+            # Apply pattern cyclically based on working days
+            shift = pattern[i % pattern_length]
             if shift_counts[emp][shift] < employee_data.loc[employee_data['Name'] == emp, f"{shift}_max"].iloc[0]:
                 roster[emp][day] = shift
                 shift_counts[emp][shift] += 1
+            else:
+                # Fallback to an alternative shift if max is reached
+                for alt_shift in ['G', 'S', 'N', 'M', 'E']:
+                    if alt_shift != shift and shift_counts[emp][alt_shift] < employee_data.loc[employee_data['Name'] == emp, f"{alt_shift}_max"].iloc[0]:
+                        roster[emp][day] = alt_shift
+                        shift_counts[emp][alt_shift] += 1
+                        break
     
     # Assign shifts for remaining employees and any unassigned days
     for day in range(num_days):
