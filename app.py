@@ -11,9 +11,9 @@ st.title("Automated 24/7 Shift Roster Generator (Continuous Shifts)")
 employee_data = pd.DataFrame([
     ["Gopalakrishnan Selvaraj", 10, 10, 10, 10, 5, "IIS"],
     ["Paneerselvam F", 10, 10, 10, 10, 5, "IIS"],
-    ["Rajesh Jayapalan", 10, 10, 10, 10, 5, "IIS"],
+    ["Rajesh Jayapalan", 10, 15, 5, 10, 5, "IIS"],
     ["Ajay Chidipotu", 10, 10, 10, 10, 5, "Websphere"],
-    ["Imran Khan", 10, 20, 0, 10, 5, "Websphere"],
+    ["Imran Khan", 10, 25, 0, 10, 5, "Websphere"],
     ["Sammeta Balachander", 10, 10, 10, 10, 5, "Websphere"],
     ["Ramesh Polisetty", 25, 0, 0, 0, 0, ""],  # Always General shift
     ["Muppa Divya", 0, 25, 0, 0, 0, ""],  # Always Second shift
@@ -134,14 +134,14 @@ def generate_roster():
         for idx in festival_set:
             roster[emp][idx] = 'H'
 
-    # Define shift patterns for employees with rotating shifts (based on December 2025)
+    # Define shift patterns for employees with rotating shifts
     rotating_shift_employees = {
-        "Gopalakrishnan Selvaraj": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'N', 'N', 'G', 'G', 'G', 'S', 'S', 'G', 'N'],
-        "Paneerselvam F": ['S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'M', 'M', 'N', 'N', 'N', 'G', 'G', 'N', 'M'],
-        "Rajesh Jayapalan": ['N', 'N', 'N', 'N', 'N', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'G', 'G', 'G', 'M', 'G'],
-        "Ajay Chidipotu": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'G', 'G', 'S', 'N'],
-        "Imran Khan": ['S', 'S', 'S', 'S', 'S', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'S', 'G', 'M', 'G'],
-        "Sammeta Balachander": ['N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'M', 'M', 'M', 'G', 'G', 'S', 'S', 'G', 'S']
+        "Gopalakrishnan Selvaraj": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N'],
+        "Paneerselvam F": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N'],
+        "Rajesh Jayapalan": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N'],
+        "Ajay Chidipotu": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N'],
+        "Imran Khan": ['S', 'S', 'S', 'S', 'S', 'M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
+        "Sammeta Balachander": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N']
     }
     
     # Define fixed shift employees
@@ -158,7 +158,7 @@ def generate_roster():
     # Track shift counts to enforce maximums
     shift_counts = {emp: {'G': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0} for emp in employees}
     
-    # Track global working day index for each employee to ensure shift continuity
+    # Track global working day index for rotating employees to ensure shift continuity
     working_day_index = {emp: 0 for emp in rotating_shift_employees}
     
     # Apply shifts for listed employees based on pattern
@@ -169,8 +169,13 @@ def generate_roster():
         for day in range(num_days):
             if day in assign_off_days(emp, num_days) or day in festival_set:
                 continue  # Skip offs and holidays
-            # Apply pattern using global working day index
-            shift = pattern[working_day_index[emp] % pattern_length]
+            # For fixed shift employees, use the single shift
+            if emp in fixed_shift_employees:
+                shift = pattern[0]
+            else:
+                # For rotating employees, use working_day_index
+                shift = pattern[working_day_index[emp] % pattern_length]
+                working_day_index[emp] += 1
             if shift_counts[emp][shift] < employee_data.loc[employee_data['Name'] == emp, f"{shift}_max"].iloc[0]:
                 roster[emp][day] = shift
                 shift_counts[emp][shift] += 1
@@ -181,7 +186,6 @@ def generate_roster():
                         roster[emp][day] = alt_shift
                         shift_counts[emp][alt_shift] += 1
                         break
-            working_day_index[emp] += 1  # Increment only on working days
     
     # Assign shifts for remaining employees and any unassigned days
     for day in range(num_days):
