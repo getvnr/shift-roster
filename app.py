@@ -3,11 +3,10 @@ import pandas as pd
 import numpy as np
 from calendar import monthrange, weekday
 import random
-import itertools
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (Random Weekly Opposite Shifts)")
+st.title("Automated 24/7 Shift Roster Generator (5-Day Weekday Patterns)")
 
 # --- Default Employees and Shift Limits ---
 employee_data = pd.DataFrame([
@@ -67,7 +66,7 @@ for i in range(len(groups)):
 
 # --- Month & Year ---
 year = st.number_input("Year", min_value=2023, max_value=2100, value=2025)
-month = st.selectbox("Month", list(range(1, 13)), index=10, format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
+month = st.selectbox("Month", list(range(1, 13)), index=11, format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
 num_days = monthrange(year, month)[1]
 dates = [f"{day:02d}-{month:02d}-{year}" for day in range(1, num_days + 1)]
 
@@ -155,22 +154,33 @@ def generate_roster():
     # Track shift counts
     shift_counts = {emp: {'G': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0} for emp in employees}
     
-    # Generate weekly permutations for Group 1 (Monday-Friday)
-    shift_permutations = list(itertools.permutations(['M', 'S', 'N']))
-    weeks = [(d, d + 4) for d in range(0, num_days, 7) if d + 4 < num_days]
-    for start_day, end_day in weeks:
-        # Check if the week includes Monday-Friday
+    # Define 5-day weekday patterns from provided schedule
+    group1_patterns = [
+        # Week 1: 1-5 Dec
+        [['S', 'M', 'S', 'N', 'M'], ['N', 'N', 'M', 'M', 'S'], ['M', 'S', 'N', 'S', 'N']],
+        # Week 2: 8-12 Dec
+        [['N', 'S', 'S', 'M', 'N'], ['M', 'N', 'M', 'S', 'S'], ['S', 'M', 'N', 'N', 'M']],
+        # Week 3: 15-19 Dec
+        [['M', 'S', 'S', 'N', 'N'], ['S', 'N', 'M', 'M', 'S'], ['N', 'M', 'N', 'S', 'M']],
+        # Week 4: 22-26 Dec
+        [['S', 'S', 'N', 'N', 'M'], ['N', 'M', 'M', 'S', 'N'], ['M', 'N', 'S', 'M', 'S']]
+    ]
+    
+    # Generate shifts for Group 1 and Group 2
+    weeks = [(d, min(d + 4, num_days - 1)) for d in range(0, num_days, 7)]
+    random.shuffle(group1_patterns)  # Randomize pattern order
+    for week_idx, (start_day, end_day) in enumerate(weeks):
+        # Get working days (Monday-Friday, not festival)
         week_days = [(d, weekday(year, month, d + 1)) for d in range(start_day, end_day + 1)]
-        working_days = [d for d, wd in week_days if wd < 5 and d not in festival_set]  # Monday-Friday, not festival
+        working_days = [d for d, wd in week_days if wd < 5 and d not in festival_set]
         if not working_days:
             continue
-        # Randomly select a permutation for each day
-        random.shuffle(shift_permutations)
+        # Select pattern for the week
+        pattern = group1_patterns[week_idx % len(group1_patterns)]
         for day_idx, day in enumerate(working_days):
-            perm = shift_permutations[day_idx % len(shift_permutations)]
-            # Assign to Group 1
+            # Assign Group 1 shifts
             for emp_idx, emp in enumerate(group1):
-                shift = perm[emp_idx]
+                shift = pattern[emp_idx][day_idx]
                 if shift_counts[emp][shift] < employee_data.loc[employee_data['Name'] == emp, f"{shift}_max"].iloc[0]:
                     roster[emp][day] = shift
                     shift_counts[emp][shift] += 1
@@ -181,7 +191,7 @@ def generate_roster():
                             roster[emp][day] = alt_shift
                             shift_counts[emp][alt_shift] += 1
                             break
-            # Assign opposite shifts to Group 2
+            # Assign Group 2 opposite shifts
             for emp_idx, emp in enumerate(group2):
                 g1_shift = roster[group1[emp_idx]][day]
                 if emp == "Imran Khan":
