@@ -221,44 +221,44 @@ def generate_roster():
         n_candidates.sort(key=lambda x: shift_counts[x]['N'])
         n_assigned = 0
         for emp in n_candidates:
-            if n_assigned >= N_req: break
-            if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
+        if n_assigned >= N_req: break
+        if day >= 5 and all(roster[emp][day - 5 + p] == 'N' for p in range(5)): continue
+        roster[emp][day] = 'N'
+        shift_counts[emp]['N'] += 1
+        n_assigned += 1
+        available.remove(emp)
+    
+    # Assign General Shift
+    g_candidates = [e for e in available if shift_counts[e]['G'] < employee_data.loc[employee_data['Name'] == e, 'G_max'].iloc[0]]
+    g_candidates.sort(key=lambda x: shift_counts[x]['G'])
+    g_assigned = 0
+    for emp in g_candidates:
+        if g_assigned >= G_req: break
+        roster[emp][day] = 'G'
+        shift_counts[emp]['G'] += 1
+        g_assigned += 1
+        available.remove(emp)
+    
+    # Assign Second Shift to remaining
+    s_candidates = [e for e in available if shift_counts[e]['S'] < employee_data.loc[employee_data['Name'] == e, 'S_max'].iloc[0]]
+    for emp in s_candidates:
+        if S_req > 0:
+            roster[emp][day] = 'S'
+            shift_counts[emp]['S'] += 1
+            S_req -= 1
+
+# Verify minimum 5 Night shifts for Group 1
+group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
+for emp in group1:
+    if shift_counts[emp]['N'] < 5:
+        available_days = [d for d in range(num_days) if roster[emp][d] in ['M', 'S'] and d not in festival_set]
+        for day in available_days[:5 - shift_counts[emp]['N']]:
+            old_shift = roster[emp][day]
             roster[emp][day] = 'N'
             shift_counts[emp]['N'] += 1
-            n_assigned += 1
-            available.remove(emp)
-        
-        # Assign General Shift
-        g_candidates = [e for e in available if shift_counts[e]['G'] < employee_data.loc[employee_data['Name'] == e, 'G_max'].iloc[0]]
-        g_candidates.sort(key=lambda x: shift_counts[x]['G'])
-        g_assigned = 0
-        for emp in g_candidates:
-            if g_assigned >= G_req: break
-            roster[emp][day] = 'G'
-            shift_counts[emp]['G'] += 1
-            g_assigned += 1
-            available.remove(emp)
-        
-        # Assign Second Shift to remaining
-        s_candidates = [e for e in available if shift_counts[e]['S'] < employee_data.loc[employee_data['Name'] == e, 'S_max'].iloc[0]]
-        for emp in s_candidates:
-            if S_req > 0:
-                roster[emp][day] = 'S'
-                shift_counts[emp]['S'] += 1
-                S_req -= 1
-    
-    # Verify minimum 5 Night shifts for Group 1
-    group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-    for emp in group1:
-        if shift_counts[emp]['N'] < 5:
-            available_days = [d for d in range(num_days) if roster[emp][d] in ['M', 'S'] and d not in festival_set]
-            for day in available_days[:5 - shift_counts[emp]['N']]:
-                old_shift = roster[emp][day]
-                roster[emp][day] = 'N'
-                shift_counts[emp]['N'] += 1
-                shift_counts[emp][old_shift] -= 1
-    
-    return roster
+            shift_counts[emp][old_shift] -= 1
+
+return roster
 
 # --- Generate & Display ---
 roster_dict = generate_roster()
@@ -286,7 +286,7 @@ summary = pd.DataFrame({
     s: [sum(1 for v in roster_dict[e] if v == s) for e in employees]
     for s in ['G', 'S', 'N', 'M', 'E', 'O', 'H']
 }, index=employees)
-st.dataಸಾದಾನಿಮಾಡುsummary)
+st.dataframe(summary)
 
 # --- Download CSV ---
 csv = df_roster.to_csv().encode('utf-8')
