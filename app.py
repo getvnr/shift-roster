@@ -5,13 +5,13 @@ from calendar import monthrange, weekday
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (5-day blocks)")
+st.title("Automated 24/7 Shift Roster Generator (Continuous Shifts)")
 
 # --- Default Employees and Shift Limits ---
 employee_data = pd.DataFrame([
     ["Gopalakrishnan Selvaraj", 10, 10, 10, 10, 5, "IIS"],
     ["Paneerselvam F", 10, 10, 10, 10, 5, "IIS"],
-    ["Rajesh Jayapalan", 10, 10, 5, 10, 5, "IIS"],
+    ["Rajesh Jayapalan", 10, 10, 10, 10, 5, "IIS"],
     ["Ajay Chidipotu", 10, 10, 10, 10, 5, "Websphere"],
     ["Imran Khan", 10, 20, 0, 10, 5, "Websphere"],
     ["Sammeta Balachander", 10, 10, 10, 10, 5, "Websphere"],
@@ -125,14 +125,15 @@ def generate_roster():
     np.random.seed(42)
     roster = {emp: [''] * num_days for emp in employees}
     
-    # Assign Offs
+    # Assign Offs and Holidays
+    festival_set = set([d - 1 for d in festival_days])
     for emp in employees:
         off_idx = assign_off_days(emp, num_days)
         for idx in off_idx:
             roster[emp][idx] = 'O'
+        for idx in festival_set:
+            roster[emp][idx] = 'H'
 
-    festival_set = set([d - 1 for d in festival_days])
-    
     # Define shift patterns for employees with rotating shifts (based on December 2025)
     rotating_shift_employees = {
         "Gopalakrishnan Selvaraj": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'N', 'N', 'G', 'G', 'G', 'S', 'S', 'G', 'N'],
@@ -157,15 +158,19 @@ def generate_roster():
     # Track shift counts to enforce maximums
     shift_counts = {emp: {'G': 0, 'S': 0, 'N': 0, 'M': 0, 'E': 0} for emp in employees}
     
+    # Track global working day index for each employee to ensure shift continuity
+    working_day_index = {emp: 0 for emp in rotating_shift_employees}
+    
     # Apply shifts for listed employees based on pattern
     listed_employees = list(rotating_shift_employees.keys()) + list(fixed_shift_employees.keys())
     for emp in listed_employees:
         pattern = rotating_shift_employees.get(emp, [fixed_shift_employees.get(emp)])
         pattern_length = len(pattern)
-        working_days = [d for d in range(num_days) if d not in assign_off_days(emp, num_days) and d not in festival_set]
-        for i, day in enumerate(working_days):
-            # Apply pattern cyclically based on working days
-            shift = pattern[i % pattern_length]
+        for day in range(num_days):
+            if day in assign_off_days(emp, num_days) or day in festival_set:
+                continue  # Skip offs and holidays
+            # Apply pattern using global working day index
+            shift = pattern[working_day_index[emp] % pattern_length]
             if shift_counts[emp][shift] < employee_data.loc[employee_data['Name'] == emp, f"{shift}_max"].iloc[0]:
                 roster[emp][day] = shift
                 shift_counts[emp][shift] += 1
@@ -176,13 +181,12 @@ def generate_roster():
                         roster[emp][day] = alt_shift
                         shift_counts[emp][alt_shift] += 1
                         break
+            working_day_index[emp] += 1  # Increment only on working days
     
     # Assign shifts for remaining employees and any unassigned days
     for day in range(num_days):
         if day in festival_set:
-            for emp in employees:
-                roster[emp][day] = 'H'
-            continue
+            continue  # Already assigned 'H'
         
         weekday_name = weekday(year, month, day + 1)
         is_weekend = weekday_name >= 5
