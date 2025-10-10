@@ -5,7 +5,7 @@ from calendar import monthrange, weekday
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Automated 24/7 Shift Roster Generator (Continuous Shifts)")
+st.title("Automated 24/7 Shift Roster Generator (Continuous Opposite Shifts)")
 
 # --- Default Employees and Shift Limits ---
 employee_data = pd.DataFrame([
@@ -136,12 +136,14 @@ def generate_roster():
 
     # Define shift patterns for employees with rotating shifts
     rotating_shift_employees = {
+        # Group 1
         "Gopalakrishnan Selvaraj": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N'],
         "Paneerselvam F": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N'],
         "Rajesh Jayapalan": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N'],
-        "Ajay Chidipotu": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N'],
+        # Group 2 (opposite shifts: M <-> N, S remains S where needed)
+        "Ajay Chidipotu": ['N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'S', 'S', 'S', 'S', 'S', 'M', 'M', 'M', 'M', 'M'],
         "Imran Khan": ['S', 'S', 'S', 'S', 'S', 'M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S', 'S'],
-        "Sammeta Balachander": ['M', 'M', 'M', 'M', 'M', 'S', 'S', 'S', 'S', 'S', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N']
+        "Sammeta Balachander": ['N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'S', 'S', 'S', 'S', 'S', 'M', 'M', 'M', 'M', 'M']
     }
     
     # Define fixed shift employees
