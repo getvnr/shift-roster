@@ -5,7 +5,7 @@ from calendar import monthrange, weekday
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Employee Leave Plan Generator")
+st.title("Employee Leave Plan Generator (Equalized Off Days)")
 
 # --- Default Employees ---
 employee_data = pd.DataFrame([
@@ -50,7 +50,7 @@ wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, def
 monday_tuesday_off = st.multiselect("Monday-Tuesday Off", employees, default=[])
 
 # --- Validate Overlaps ---
-groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off, 
+groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off,
           tuesday_wednesday_off, thursday_friday_off, wednesday_thursday_off, monday_tuesday_off]
 names = ["Fri-Sat", "Sun-Mon", "Sat-Sun", "Tue-Wed", "Thu-Fri", "Wed-Thu", "Mon-Tue"]
 for i in range(len(groups)):
@@ -73,7 +73,7 @@ festival_days = st.multiselect("Festival Days", list(range(1, num_days + 1)), de
 def get_weekdays(year, month, weekday_indices):
     return [d for d in range(1, monthrange(year, month)[1] + 1) if weekday(year, month, d) in weekday_indices]
 
-# Calculate weekdays for week-off preferences
+# Weekday mapping
 fridays_saturdays = get_weekdays(year, month, [4, 5])
 sundays_mondays = get_weekdays(year, month, [6, 0])
 saturdays_sundays = get_weekdays(year, month, [5, 6])
@@ -82,7 +82,7 @@ thursday_friday = get_weekdays(year, month, [3, 4])
 wednesday_thursday = get_weekdays(year, month, [2, 3])
 monday_tuesday = get_weekdays(year, month, [0, 1])
 
-# Calculate weekends and working days
+# Calculate weekends & working days
 saturdays = get_weekdays(year, month, [5])
 sundays = get_weekdays(year, month, [6])
 num_saturdays = len(saturdays)
@@ -97,36 +97,57 @@ st.write(f"Number of Sundays: {num_sundays}")
 st.write(f"Total Working Days (excluding weekends and festivals): {num_working_days}")
 
 # --- Leave Plan Generation ---
-def generate_leave_plan():
+def generate_leave_plan(target_offs=8):
     roster = {emp: [''] * num_days for emp in employees}
     festival_set = set([d - 1 for d in festival_days])
 
+    # Step 1: assign offs based on selected weekdays
     for emp in employees:
         off_idx = set()
         if emp in friday_saturday_off:
-            off_idx.update([d - 1 for d in fridays_saturdays if d <= num_days])
+            off_idx.update([d - 1 for d in fridays_saturdays])
         if emp in sunday_monday_off:
-            off_idx.update([d - 1 for d in sundays_mondays if d <= num_days])
+            off_idx.update([d - 1 for d in sundays_mondays])
         if emp in saturday_sunday_off:
-            off_idx.update([d - 1 for d in saturdays_sundays if d <= num_days])
+            off_idx.update([d - 1 for d in saturdays_sundays])
         if emp in tuesday_wednesday_off:
-            off_idx.update([d - 1 for d in tuesday_wednesday if d <= num_days])
+            off_idx.update([d - 1 for d in tuesday_wednesday])
         if emp in thursday_friday_off:
-            off_idx.update([d - 1 for d in thursday_friday if d <= num_days])
+            off_idx.update([d - 1 for d in thursday_friday])
         if emp in wednesday_thursday_off:
-            off_idx.update([d - 1 for d in wednesday_thursday if d <= num_days])
+            off_idx.update([d - 1 for d in wednesday_thursday])
         if emp in monday_tuesday_off:
-            off_idx.update([d - 1 for d in monday_tuesday if d <= num_days])
+            off_idx.update([d - 1 for d in monday_tuesday])
 
         for idx in off_idx:
-            roster[emp][idx] = 'O'
+            if 0 <= idx < num_days:
+                roster[emp][idx] = 'O'
         for idx in festival_set:
             roster[emp][idx] = 'H'
+
+    # Step 2: Equalize total offs for each employee
+    for emp, days in roster.items():
+        current_offs = [i for i, v in enumerate(days) if v == 'O']
+        diff = len(current_offs) - target_offs
+
+        # Remove extra offs
+        if diff > 0:
+            for idx in current_offs[-diff:]:
+                roster[emp][idx] = ''
+
+        # Add missing offs randomly
+        elif diff < 0:
+            working_days = [i for i, v in enumerate(days) if v == '']
+            if len(working_days) >= abs(diff):
+                add_days = np.random.choice(working_days, abs(diff), replace=False)
+                for idx in add_days:
+                    roster[emp][idx] = 'O'
 
     return roster
 
 # --- Generate & Display ---
-roster_dict = generate_leave_plan()
+target_offs = st.slider("Target Off Days per Employee", min_value=6, max_value=12, value=8)
+roster_dict = generate_leave_plan(target_offs)
 df_roster = pd.DataFrame(roster_dict, index=dates).T
 
 # --- Color Coding ---
@@ -140,8 +161,8 @@ st.dataframe(df_roster.style.applymap(color_leaves), height=600)
 # --- Leave Summary ---
 st.subheader("Leave Summary")
 summary = pd.DataFrame({
-    'O': [sum(1 for v in roster_dict[e] if v == 'O') for e in employees],
-    'H': [sum(1 for v in roster_dict[e] if v == 'H') for e in employees]
+    'Off Days (O)': [sum(1 for v in roster_dict[e] if v == 'O') for e in employees],
+    'Holidays (H)': [sum(1 for v in roster_dict[e] if v == 'H') for e in employees]
 }, index=employees)
 st.dataframe(summary)
 
