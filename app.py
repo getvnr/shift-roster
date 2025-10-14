@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 from calendar import monthrange, weekday
 import io  # for Excel export
-import openpyxl  # Explicitly import to ensure it's loaded (fixes some env issues)
 
 st.set_page_config(layout="wide", page_title="Employee Leave & Shift Planner")
 st.title("Employee Leave & Shift Planner — 24/7 Coverage")
@@ -30,7 +29,7 @@ employee_data = pd.DataFrame([
     ["Thorat Yashwant", "", "Any"],
     ["Srivastav Nitin", "", "Any"],
     ["Kishore Khati Vaibhav", "", "Any"],
-    ["Rupan Venkatesen Anandha", "", "Any"],
+    ["Rupan Venkatesan Anandha", "", "Any"],
     ["Chaudhari Kaustubh", "", "Any"],
     ["Shejal Gawade", "", "Any"],
     ["Vivek Kushwaha", "", "Any"],
@@ -51,7 +50,7 @@ group4 = ["Muppa Divya", "Anil Athkuri", "D Namithananda"]
 coverage_pool = [
     "Pousali C", "B Madhurusha", "Chinthalapudi Yaswanth", "Edagotti Kalpana",
     "Thorat Yashwant", "Srivastav Nitin", "Kishore Khati Vaibhav",
-    "Rupan Venkatesen Anandha", "Chaudhari Kaustubh", "Shejal Gawade", "Vivek Kushwaha"
+    "Rupan Venkatesan Anandha", "Chaudhari Kaustubh", "Shejal Gawade", "Vivek Kushwaha"
 ]
 
 # --------------------------
@@ -253,6 +252,9 @@ with tab1:
         df_plan = pd.DataFrame(plan, index=dates).T
         st.session_state['plan_raw'] = df_plan
         st.session_state['shift_count'] = pd.DataFrame(shift_count).T
+        st.session_state['year'] = year
+        st.session_state['month'] = month
+        st.session_state['max_nights_per_person'] = max_nights_per_person
         st.success("Initial plan generated! Go to Preview / Edit to tweak.")
 
 # -------------------------------------------------
@@ -295,8 +297,9 @@ with tab4:
         st.warning("Lock a plan in the Preview tab first.")
     else:
         df_plan = st.session_state['final_plan']
-        year = year  # Carry over from tab1 (assume still in scope; in prod, store in session)
-        month = month
+        year = st.session_state.get('year', 2025)
+        month = st.session_state.get('month', 1)
+        max_nights_per_person = st.session_state.get('max_nights_per_person', 6)
 
         def color_map(val):
             cmap = {
@@ -305,31 +308,6 @@ with tab4:
             }
             return f'background-color: {cmap.get(val, "")}'
         styled = df_plan.style.applymap(color_map)
-
-        # Simple CSV export always
-        csv = df_plan.to_csv().encode('utf-8')
-        st.download_button("Download CSV", csv, f"shift_plan_{year}_{month:02d}.csv", "text/csv")
-
-        # Excel export with fallback
-        try:
-            xlsx_bytes = io.BytesIO()
-            with pd.ExcelWriter(xlsx_bytes, engine='openpyxl') as writer:
-                # Write the data without style first
-                df_plan.to_excel(writer, sheet_name='Plan')
-                # Manually apply colors to the worksheet
-                workbook = writer.book
-                worksheet = writer.sheets['Plan']
-                for row_idx, emp in enumerate(df_plan.index, start=2):  # +2 for headers
-                    for col_idx, date in enumerate(df_plan.columns, start=2):
-                        val = df_plan.loc[emp, date]
-                        cell = worksheet.cell(row=row_idx, column=col_idx)
-                        cell.fill = openpyxl.styles.PatternFill(start_color=cmap.get(val, 'FFFFFF'), end_color=cmap.get(val, 'FFFFFF'), fill_type='solid')
-            xlsx_bytes.seek(0)
-            st.download_button("Download Excel (with colors)", xlsx_bytes.read(), f"shift_plan_{year}_{month:02d}.xlsx",
-                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        except Exception as e:
-            st.warning(f"Excel export failed ({str(e)}), use CSV instead.")
-
         st.dataframe(styled, height=600)
 
         # Totals
@@ -351,6 +329,34 @@ with tab4:
         })
         st.subheader("Daily coverage")
         st.dataframe(daily)
+
+        # Downloads - CSV always
+        csv = df_plan.to_csv().encode('utf-8')
+        st.download_button("Download CSV", csv, f"shift_plan_{year}_{month:02d}.csv", "text/csv")
+
+        # Excel export with colors (uses pandas + openpyxl via engine)
+        try:
+            xlsx_bytes = io.BytesIO()
+            with pd.ExcelWriter(xlsx_bytes, engine='openpyxl') as writer:
+                df_plan.to_excel(writer, sheet_name='Plan')
+                workbook = writer.book
+                worksheet = writer.sheets['Plan']
+                cmap = {
+                    'F': 'd4f6d4', 'S': 'c3e0ff', 'M': 'ffff99', 'N': 'ffccdd',
+                    'G': 'ffd700', 'E': 'ee82ee', 'O': 'e6e6e6', 'H': 'ffb84d', 'L': 'ff6666'
+                }
+                from openpyxl.styles import PatternFill
+                for row_idx, emp in enumerate(df_plan.index, start=2):  # headers at row 1-2
+                    for col_idx, date in enumerate(df_plan.columns, start=2):
+                        val = df_plan.loc[emp, date]
+                        if val in cmap:
+                            fill = PatternFill(start_color=cmap[val], end_color=cmap[val], fill_type='solid')
+                            worksheet.cell(row=row_idx, column=col_idx).fill = fill
+            xlsx_bytes.seek(0)
+            st.download_button("Download Excel (with colors)", xlsx_bytes.read(), f"shift_plan_{year}_{month:02d}.xlsx",
+                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        except Exception as e:
+            st.warning(f"Excel export failed ({str(e)}); falling back to CSV only. Ensure 'openpyxl' is in requirements.txt")
 
         # Compliance
         nights = totals['N']
