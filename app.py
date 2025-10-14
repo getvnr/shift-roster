@@ -5,7 +5,7 @@ from calendar import monthrange, weekday
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Employee Leave Plan Generator (Equalized Off Days)")
+st.title("Employee Leave & Shift Plan Generator (Equalized + Opposite Shifts)")
 
 # --- Default Employees ---
 employee_data = pd.DataFrame([
@@ -69,7 +69,7 @@ dates = [f"{day:02d}-{month:02d}-{year}" for day in range(1, num_days + 1)]
 # --- Festival Days ---
 festival_days = st.multiselect("Festival Days", list(range(1, num_days + 1)), default=[])
 
-# --- Helper Functions ---
+# --- Helper Function ---
 def get_weekdays(year, month, weekday_indices):
     return [d for d in range(1, monthrange(year, month)[1] + 1) if weekday(year, month, d) in weekday_indices]
 
@@ -101,7 +101,6 @@ def generate_leave_plan(target_offs=8):
     roster = {emp: [''] * num_days for emp in employees}
     festival_set = set([d - 1 for d in festival_days])
 
-    # Step 1: assign offs based on selected weekdays
     for emp in employees:
         off_idx = set()
         if emp in friday_saturday_off:
@@ -125,17 +124,14 @@ def generate_leave_plan(target_offs=8):
         for idx in festival_set:
             roster[emp][idx] = 'H'
 
-    # Step 2: Equalize total offs for each employee
+    # Equalize total offs
     for emp, days in roster.items():
         current_offs = [i for i, v in enumerate(days) if v == 'O']
         diff = len(current_offs) - target_offs
 
-        # Remove extra offs
         if diff > 0:
             for idx in current_offs[-diff:]:
                 roster[emp][idx] = ''
-
-        # Add missing offs randomly
         elif diff < 0:
             working_days = [i for i, v in enumerate(days) if v == '']
             if len(working_days) >= abs(diff):
@@ -145,27 +141,72 @@ def generate_leave_plan(target_offs=8):
 
     return roster
 
-# --- Generate & Display ---
+# --- Generate Leave Plan ---
 target_offs = st.slider("Target Off Days per Employee", min_value=6, max_value=12, value=8)
 roster_dict = generate_leave_plan(target_offs)
+
+# --- Opposite Shift Logic for Group1 ---
+group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
+shifts = ['F', 'S', 'N']
+shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in group1}
+
+for day in range(num_days):
+    # Skip if any has off/holiday that day
+    skip_day = any(roster_dict[emp][day] in ['O', 'H'] for emp in group1)
+    if skip_day:
+        continue
+
+    np.random.shuffle(shifts)
+    for emp, shift in zip(group1, shifts):
+        # Respect max limits
+        if shift == 'N' and shift_counts[emp]['N'] >= 10:
+            shift = np.random.choice(['F', 'S'])
+        elif shift == 'F' and shift_counts[emp]['F'] >= 10:
+            shift = np.random.choice(['S', 'N'])
+        elif shift == 'S' and shift_counts[emp]['S'] >= 10:
+            shift = np.random.choice(['F', 'N'])
+
+        roster_dict[emp][day] = shift
+        shift_counts[emp][shift] += 1
+
+# Adjust if minimums not met
+for emp in group1:
+    for shift_type in ['F', 'S']:
+        while shift_counts[emp][shift_type] < 5:
+            for day in range(num_days):
+                if roster_dict[emp][day] == '':
+                    roster_dict[emp][day] = shift_type
+                    shift_counts[emp][shift_type] += 1
+                    break
+
+# --- Convert to DataFrame ---
 df_roster = pd.DataFrame(roster_dict, index=dates).T
 
 # --- Color Coding ---
 def color_leaves(val):
-    colors = {'O': 'lightgray', 'H': 'orange'}
+    colors = {
+        'O': 'lightgray', 
+        'H': 'orange',
+        'F': '#90EE90',   # Light green
+        'S': '#ADD8E6',   # Light blue
+        'N': '#DDA0DD'    # Light purple
+    }
     return f'background-color: {colors.get(val, "")}'
 
-st.subheader("Employee Leave Plan")
+st.subheader("Employee Leave & Shift Plan")
 st.dataframe(df_roster.style.applymap(color_leaves), height=600)
 
 # --- Leave Summary ---
-st.subheader("Leave Summary")
+st.subheader("Leave & Shift Summary")
 summary = pd.DataFrame({
     'Off Days (O)': [sum(1 for v in roster_dict[e] if v == 'O') for e in employees],
-    'Holidays (H)': [sum(1 for v in roster_dict[e] if v == 'H') for e in employees]
+    'Holidays (H)': [sum(1 for v in roster_dict[e] if v == 'H') for e in employees],
+    'F Days': [sum(1 for v in roster_dict[e] if v == 'F') for e in employees],
+    'S Days': [sum(1 for v in roster_dict[e] if v == 'S') for e in employees],
+    'N Days': [sum(1 for v in roster_dict[e] if v == 'N') for e in employees]
 }, index=employees)
 st.dataframe(summary)
 
 # --- Download CSV ---
 csv = df_roster.to_csv().encode('utf-8')
-st.download_button("Download Leave Plan CSV", csv, f"leave_plan_{year}_{month:02d}.csv")
+st.download_button("Download Leave & Shift Plan CSV", csv, f"leave_shift_plan_{year}_{month:02d}.csv")
