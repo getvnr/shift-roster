@@ -18,43 +18,49 @@ tab1, tab2, tab3 = st.tabs(["🗓️ Configure & Generate", "🙋 Individual Lea
 
 # TAB 1: Configuration & Generate
 with tab1:
-    st.header("Step 1 — Configure month & generate 24/7 roster")
+    st.header("Configure month & generate 24/7 roster")
     year = st.number_input("Year", 2023, 2100, 2025)
     month = st.selectbox("Month", range(1,13), index=9, format_func=lambda x: pd.Timestamp(year,x,1).strftime("%B"))
     num_days = monthrange(year, month)[1]
     dates = [pd.Timestamp(year, month, d).strftime("%d-%b-%Y") for d in range(1, num_days+1)]
 
     festival_days = st.multiselect("Festival days (1..n)", list(range(1, num_days+1)))
-    max_night_per_person = st.number_input("Max Night (N) per month", 0, num_days, 5)
-    min_morning = st.number_input("Min Morning (F) per day", 2, 3, 2)
-    max_morning = st.number_input("Max Morning (F) per day", 2, 3, 3)
-    min_second = st.number_input("Min Second (S) per day", 3, 4, 3)
-    max_second = st.number_input("Max Second (S) per day", 3, 4, 4)
+
+    min_morning = st.number_input("Min Morning (F) per employee per month", 5, 10, 5)
+    max_morning = st.number_input("Max Morning (F) per employee per month", 5, 10, 10)
+    min_second = st.number_input("Min Second (S) per employee per month", 5, 10, 5)
+    max_second = st.number_input("Max Second (S) per employee per month", 5, 10, 10)
+    max_night_per_person = st.number_input("Max Night (N) per employee per month", 0, 5, 5)
+
     max_night_per_day = st.number_input("Max Night per day", 1, 5, 2)
+    min_morning_per_day = st.number_input("Min Morning per day", 2, 5, 2)
+    max_morning_per_day = st.number_input("Max Morning per day", 2, 5, 3)
+    min_second_per_day = st.number_input("Min Second per day", 3, 5, 3)
+    max_second_per_day = st.number_input("Max Second per day", 3, 5, 4)
 
     if st.button("Generate 24/7 Roster"):
         plan = pd.DataFrame('', index=employees, columns=dates)
         night_count = {emp:0 for emp in employees}
+        f_count = {emp:0 for emp in employees}
+        s_count = {emp:0 for emp in employees}
         rng = np.random.default_rng(seed=(year*100+month))
 
-        # Generate weekly offs per employee: 2 days off every 4-5 working days
+        # Generate weekly offs per employee: 2 consecutive days every 4-5 working days
         weekly_off_days = {emp:[] for emp in employees}
         for emp in employees:
             day = 0
             while day < num_days:
-                # pick 2 consecutive off days every 4–5 working days
                 start_off = min(day + rng.integers(4,6), num_days-1)
                 off_days = [start_off, min(start_off+1, num_days-1)]
                 weekly_off_days[emp].extend(off_days)
                 day = start_off + 2
 
-        # Assign shifts
+        # Assign shifts with continuity until weekly off
         for d_idx, date in enumerate(dates):
             assigned_N = 0
             assigned_F = 0
             assigned_S = 0
 
-            # Shuffle employees for fairness
             shuffled_emps = list(rng.permutation(employees))
             for emp in shuffled_emps:
                 if plan.loc[emp, date] != '':
@@ -66,20 +72,37 @@ with tab1:
                 elif d_idx+1 in festival_days:
                     plan.loc[emp, date] = 'H'
                 else:
-                    # Assign Night if allowed
-                    if assigned_N < max_night_per_day and night_count[emp] < max_night_per_person:
-                        plan.loc[emp, date] = 'N'
-                        night_count[emp] += 1
-                        assigned_N +=1
-                    elif assigned_F < max_morning:
-                        plan.loc[emp, date] = 'F'
-                        assigned_F +=1
-                    elif assigned_S < max_second:
-                        plan.loc[emp, date] = 'S'
-                        assigned_S +=1
+                    # Continue last shift if not off
+                    last_shift = plan.loc[emp, dates[d_idx-1]] if d_idx>0 else ''
+                    if last_shift in ['F','S','N']:
+                        shift = last_shift
                     else:
-                        # Fill extra with S to maintain coverage
-                        plan.loc[emp, date] = 'S'
+                        # Assign new shift respecting min/max per month and per day
+                        if assigned_N < max_night_per_day and night_count[emp] < max_night_per_person:
+                            shift = 'N'
+                            night_count[emp] += 1
+                            assigned_N += 1
+                        elif assigned_F < max_morning_per_day and f_count[emp] < max_morning:
+                            shift = 'F'
+                            f_count[emp] += 1
+                            assigned_F += 1
+                        elif assigned_S < max_second_per_day and s_count[emp] < max_second:
+                            shift = 'S'
+                            s_count[emp] += 1
+                            assigned_S += 1
+                        else:
+                            # Fill remaining coverage
+                            if f_count[emp] < max_morning:
+                                shift = 'F'
+                                f_count[emp] +=1
+                                assigned_F +=1
+                            elif s_count[emp] < max_second:
+                                shift = 'S'
+                                s_count[emp] +=1
+                                assigned_S +=1
+                            else:
+                                shift = 'S' # fallback
+                    plan.loc[emp, date] = shift
 
         st.session_state['final_plan'] = plan
         st.success("24/7 Roster generated successfully!")
