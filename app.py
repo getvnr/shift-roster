@@ -15,13 +15,13 @@ employee_data = pd.DataFrame([
     ["Ajay Chidipotu", "Websphere"],
     ["Imran Khan", "Websphere"],
     ["Sammeta Balachander", "Websphere"],
-    ["Ramesh Polisetty", ""],
-    ["Muppa Divya", ""],
-    ["Anil Athkuri", ""],
-    ["D Namithananda", ""],
-    ["Srinivasu Cheedalla", ""],
-    ["Gangavarapu Suneetha", ""],
-    ["Lakshmi Narayana Rao", ""],
+    ["Ramesh Polisetty", "Middleware"],
+    ["Srinivasu Cheedalla", "Middleware"],
+    ["Gangavarapu Suneetha", "Middleware"],
+    ["Lakshmi Narayana Rao", "Middleware"],
+    ["Muppa Divya", "Middleware"],
+    ["Anil Athkuri", "Middleware"],
+    ["D Namithananda", "Middleware"],
     ["Pousali C", ""],
     ["Thorat Yashwant", ""],
     ["Srivastav Nitin", ""],
@@ -82,23 +82,30 @@ with tab1:
     )
     festival_set = set(festival_days)
 
-    # --- Group 1 & Group 2 ---
+    # --- Groups ---
     group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
     group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
+    group3 = [
+        "Ramesh Polisetty",
+        "Srinivasu Cheedalla",
+        "Gangavarapu Suneetha",
+        "Lakshmi Narayana Rao"
+    ]
+    group4 = ["Muppa Divya", "Anil Athkuri", "D Namithananda"]
 
     st.subheader("Step 4: Generate Plan")
 
     # --- Generate Leave & Shift Plan ---
-    def generate_plan(target_offs=10):
+    def generate_plan():
         plan = {emp: [''] * num_days for emp in employees}
 
-        # 1. Apply weekoff logic
+        # Weekoff logic
         def apply_weekoff(emp, days):
             for d in days:
                 if 1 <= d <= num_days:
                     plan[emp][d - 1] = "O"
 
-        # Calculate weekday-based offs
+        # Weekoff pattern detection
         def get_weekoff_days(pattern):
             patterns = {
                 "Friday-Saturday": [4, 5],
@@ -131,23 +138,22 @@ with tab1:
             for f in festival_set:
                 plan[emp][f - 1] = "H"
 
-        # 2. Group1 Opposite Shift Logic (F, S, N)
+        # --- Group 1 rotation (F → S → N) ---
         shift_cycle = ["F", "S", "N"]
         shift_index = 0
         for emp in group1:
             current_shift = shift_cycle[shift_index]
             for d in range(1, num_days + 1):
-                if plan[emp][d - 1] == "O":  # Rotate shift after off
+                if plan[emp][d - 1] == "O":  # Rotate after week-off
                     shift_index = (shift_index + 1) % 3
                     current_shift = shift_cycle[shift_index]
                 elif plan[emp][d - 1] == "":
                     plan[emp][d - 1] = current_shift
 
-        # 3. Group2 Opposite Shift Logic (Imran: No N shift)
+        # --- Group 2 rotation (Imran: no N shift) ---
         shift_cycle_g2 = ["F", "S", "N"]
         shift_index = 0
         for emp in group2:
-            # Imran gets only F and S
             if emp == "Imran Khan":
                 custom_cycle = ["F", "S"]
                 current_shift = custom_cycle[shift_index % 2]
@@ -164,9 +170,27 @@ with tab1:
                 elif plan[emp][d - 1] == "":
                     plan[emp][d - 1] = current_shift
 
-        # 4. Assign random shifts for others
+        # --- Group 3: Fixed Shifts (No rotation) ---
+        fixed_shifts_g3 = {
+            "Ramesh Polisetty": "G",
+            "Srinivasu Cheedalla": "E",
+            "Gangavarapu Suneetha": "G",
+            "Lakshmi Narayana Rao": "G"
+        }
+        for emp, shift in fixed_shifts_g3.items():
+            for d in range(1, num_days + 1):
+                if plan[emp][d - 1] == "":
+                    plan[emp][d - 1] = shift
+
+        # --- Group 4: Always S shift ---
+        for emp in group4:
+            for d in range(1, num_days + 1):
+                if plan[emp][d - 1] == "":
+                    plan[emp][d - 1] = "S"
+
+        # --- Others: random shifts ---
         for emp in employees:
-            if emp not in group1 + group2:
+            if emp not in group1 + group2 + group3 + group4:
                 shifts = ["F", "S", "N"]
                 for d in range(1, num_days + 1):
                     if plan[emp][d - 1] == "":
@@ -178,25 +202,11 @@ with tab1:
         plan = generate_plan()
         df_plan = pd.DataFrame(plan, index=dates).T
 
-        # --- Display ---
         def color_shifts(val):
-            color_map = {'F': 'lightgreen', 'S': 'lightblue', 'N': 'lightpink', 'O': 'lightgray', 'H': 'orange'}
+            color_map = {'F': 'lightgreen', 'S': 'lightblue', 'N': 'lightpink', 'G': 'gold', 'E': 'violet', 'O': 'lightgray', 'H': 'orange'}
             return f'background-color: {color_map.get(val, "")}'
 
         st.dataframe(df_plan.style.applymap(color_shifts), height=600)
-
-        # --- Summary ---
-        summary = pd.DataFrame({
-            "F": [sum(1 for v in plan[e] if v == "F") for e in employees],
-            "S": [sum(1 for v in plan[e] if v == "S") for e in employees],
-            "N": [sum(1 for v in plan[e] if v == "N") for e in employees],
-            "O": [sum(1 for v in plan[e] if v == "O") for e in employees],
-            "H": [sum(1 for v in plan[e] if v == "H") for e in employees],
-        }, index=employees)
-
-        st.subheader("Summary")
-        st.dataframe(summary)
-
         st.session_state['final_plan'] = df_plan
 
 # ========================================
@@ -204,7 +214,6 @@ with tab1:
 # ========================================
 with tab2:
     st.subheader("Mark Individual Employee Leave")
-
     if "final_plan" in st.session_state:
         df_plan = st.session_state['final_plan']
         emp = st.selectbox("Select Employee", employees)
@@ -223,14 +232,14 @@ with tab2:
 # ========================================
 with tab3:
     st.subheader("Final Shift + Leave Plan")
-
     if "final_plan" in st.session_state:
         df_plan = st.session_state['final_plan']
 
         def color_all(val):
             color_map = {
                 'F': 'lightgreen', 'S': 'lightblue', 'N': 'lightpink',
-                'O': 'lightgray', 'H': 'orange', 'L': 'red'
+                'G': 'gold', 'E': 'violet', 'O': 'lightgray',
+                'H': 'orange', 'L': 'red'
             }
             return f'background-color: {color_map.get(val, "")}'
 
