@@ -82,9 +82,9 @@ with tab1:
     )
     festival_set = set(festival_days)
 
-    # --- Group1 (Opposite Shift) ---
+    # --- Group 1 & Group 2 ---
     group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-    shift_cycle = ["F", "S", "N"]
+    group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
 
     st.subheader("Step 4: Generate Plan")
 
@@ -131,7 +131,8 @@ with tab1:
             for f in festival_set:
                 plan[emp][f - 1] = "H"
 
-        # 2. Assign Group1 opposite shifts (rotate after weekoff)
+        # 2. Group1 Opposite Shift Logic (F, S, N)
+        shift_cycle = ["F", "S", "N"]
         shift_index = 0
         for emp in group1:
             current_shift = shift_cycle[shift_index]
@@ -142,9 +143,30 @@ with tab1:
                 elif plan[emp][d - 1] == "":
                     plan[emp][d - 1] = current_shift
 
-        # 3. Assign default shifts for others
+        # 3. Group2 Opposite Shift Logic (Imran: No N shift)
+        shift_cycle_g2 = ["F", "S", "N"]
+        shift_index = 0
+        for emp in group2:
+            # Imran gets only F and S
+            if emp == "Imran Khan":
+                custom_cycle = ["F", "S"]
+                current_shift = custom_cycle[shift_index % 2]
+            else:
+                current_shift = shift_cycle_g2[shift_index]
+
+            for d in range(1, num_days + 1):
+                if plan[emp][d - 1] == "O":  # Rotate after off
+                    shift_index = (shift_index + 1) % len(shift_cycle_g2)
+                    if emp == "Imran Khan":
+                        current_shift = custom_cycle[shift_index % 2]
+                    else:
+                        current_shift = shift_cycle_g2[shift_index]
+                elif plan[emp][d - 1] == "":
+                    plan[emp][d - 1] = current_shift
+
+        # 4. Assign random shifts for others
         for emp in employees:
-            if emp not in group1:
+            if emp not in group1 + group2:
                 shifts = ["F", "S", "N"]
                 for d in range(1, num_days + 1):
                     if plan[emp][d - 1] == "":
