@@ -5,7 +5,7 @@ from calendar import monthrange, weekday
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Employee Leave & Shift Plan Generator")
+st.title("Employee Leave & Shift Plan Generator (Fair Offs)")
 
 # --- Employee Data ---
 employee_data = pd.DataFrame([
@@ -82,7 +82,6 @@ def generate_plan(target_offs=8):
             roster[emp][idx] = 'H'
 
     # Step 2: Apply group rules
-    # Group1 shifts F/S/N rotation, max limits
     group1 = employee_data[employee_data.Group=="Group1"]["Name"].tolist()
     group2 = employee_data[employee_data.Group=="Group2"]["Name"].tolist()
     group3 = employee_data[employee_data.Group=="Group3"]["Name"].tolist()
@@ -92,12 +91,11 @@ def generate_plan(target_offs=8):
     shifts = ['F','S','N']
     group1_shifts = {emp: [] for emp in group1}
     group2_shifts = {emp: [] for emp in group2}
-    
-    # Apply Group1 rotation
-    for i, day in enumerate(range(num_days)):
+
+    # Group1 rotation
+    for day in range(num_days):
         for idx, emp in enumerate(group1):
             if roster[emp][day]=='':
-                # rotate only if previous day was off
                 if day>0 and roster[emp][day-1] in ['O','H']:
                     group1_shifts[emp].append(shifts[(day+idx)%3])
                 elif day==0:
@@ -106,15 +104,13 @@ def generate_plan(target_offs=8):
                     group1_shifts[emp].append(group1_shifts[emp][-1])
                 roster[emp][day] = group1_shifts[emp][-1]
 
-    # Apply Group2 rotation with Imran restriction (no N)
-    for i, day in enumerate(range(num_days)):
+    # Group2 rotation with Imran restriction
+    for day in range(num_days):
         for idx, emp in enumerate(group2):
             if roster[emp][day]=='':
                 if day>0 and roster[emp][day-1] in ['O','H']:
-                    shift_idx = (day+idx)%3
-                    s = shifts[shift_idx]
-                    if emp=="Imran Khan" and s=='N':
-                        s='F'
+                    s = shifts[(day+idx)%3]
+                    if emp=="Imran Khan" and s=='N': s='F'
                     group2_shifts[emp].append(s)
                 elif day==0:
                     s = shifts[idx%3]
@@ -135,25 +131,30 @@ def generate_plan(target_offs=8):
             if roster[emp][day]=='':
                 roster[emp][day]='S'
 
-    # Coverage pool: distribute fair offs & ensure 24/7 coverage
-    coverage_shifts=['F','S','N']
+    # Coverage pool fair off distribution
     max_nights=6
-    offs_per_person = min(target_offs, num_days//3)  # adjust based on month
-    # Initialize counters
+    coverage_shifts=['F','S','N']
+    offs_per_person = target_offs
     night_count = {emp:0 for emp in coverage}
+
+    # Evenly distribute offs across month
+    for emp in coverage:
+        possible_days = [i for i in range(num_days) if roster[emp][i]=='']
+        if len(possible_days)<offs_per_person:
+            offs_to_assign = possible_days
+        else:
+            step = len(possible_days)//offs_per_person
+            offs_to_assign = possible_days[::step][:offs_per_person]
+        for idx in offs_to_assign:
+            roster[emp][idx]='O'
+
+    # Assign shifts respecting coverage limits
     for day in range(num_days):
-        day_roster=[roster[emp][day] for emp in employees if roster[emp][day] not in ['O','H']]
-        # Assign shifts while respecting limits
-        n_count=sum([1 for v in day_roster if v=='N'])
-        f_count=sum([1 for v in day_roster if v=='F'])
-        s_count=sum([1 for v in day_roster if v=='S'])
-        # Assign to unassigned
+        n_count = sum([1 for emp in employees if roster[emp][day]=='N'])
+        f_count = sum([1 for emp in employees if roster[emp][day]=='F'])
+        s_count = sum([1 for emp in employees if roster[emp][day]=='S'])
         for emp in coverage:
             if roster[emp][day]=='':
-                # Apply fair off
-                if roster[emp].count('O')<offs_per_person and np.random.rand()<0.2:
-                    roster[emp][day]='O'
-                    continue
                 # Night limit
                 if night_count[emp]<max_nights and n_count<2:
                     roster[emp][day]='N'
