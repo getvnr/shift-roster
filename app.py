@@ -41,18 +41,22 @@ employee_data = pd.DataFrame([
 
 employees = employee_data["Name"].tolist()
 
-# Groups (fixed patterns)
-group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
-group3 = ["Ramesh Polisetty", "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao"]
-group4 = ["Muppa Divya", "Anil Athkuri", "D Namithananda"]
+# Fixed employees who won't be disturbed
+fixed_employees = [
+    "Gopalakrishnan Selvaraj","Paneerselvam F","Rajesh Jayapalan",
+    "Ajay Chidipotu","Imran Khan","Sammeta Balachander",
+    "Ramesh Polisetty","Srinivasu Cheedalla","Gangavarapu Suneetha",
+    "Lakshmi Narayana Rao","Muppa Divya","Anil Athkuri","D Namithananda"
+]
+
+# Groups (for rotation logic)
+group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]  
+group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]             
+group3 = ["Ramesh Polisetty", "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao"]  
+group4 = ["Muppa Divya", "Anil Athkuri", "D Namithananda"]                  
 
 # Pool for 24/7 coverage
-coverage_pool = [
-    "Pousali C","B Madhurusha","Chinthalapudi Yaswanth","Edagotti Kalpana",
-    "Thorat Yashwant","Srivastav Nitin","Kishore Khati Vaibhav","Rupan Venkatesan Anandha",
-    "Chaudhari Kaustubh","Shejal Gawade","Vivek Kushwaha","Abdul Mukthiyar Basha","M Naveen"
-]
+coverage_pool = [e for e in employees if e not in fixed_employees]
 
 # --------------------------
 # Helpers
@@ -70,217 +74,194 @@ def get_weekoff_days_for_pattern(year, month, pattern):
         "Wednesday-Thursday": [2,3],
         "Thursday-Friday": [3,4]
     }
-    idxs = patterns.get(pattern, [])
+    idxs = patterns[pattern]
     return [d for d in range(1, monthrange(year, month)[1]+1) if weekday(year, month, d) in idxs]
 
-def count_shift_on_day(plan, day_index, shift_code):
-    return sum(1 for e in employees if plan[e][day_index] == shift_code)
+def count_shift_on_day(pln, day_index, shift_code):
+    return sum(1 for e in pln if pln[e][day_index]==shift_code)
 
 # --------------------------
-# Tabs
+# Streamlit UI
 # --------------------------
 tab1, tab2, tab3 = st.tabs(["🗓️ Config & Generate", "🙋 Individual Leave", "📊 Final Plan & Summary"])
 
-# --------------------------
-# TAB 1: Configuration
-# --------------------------
 with tab1:
     st.header("Step 1 — Configure month & weekoffs")
-
     year = st.number_input("Year", min_value=2023, max_value=2100, value=2025)
     month = st.selectbox("Month", list(range(1,13)), index=9,
                          format_func=lambda x: pd.Timestamp(year,x,1).strftime("%B"))
     num_days = monthrange(year, month)[1]
     dates = [pd.Timestamp(year, month, d).strftime("%d-%b-%Y") for d in range(1, num_days+1)]
 
-    st.subheader("Weekoff preferences")
+    # Weekoff selection
+    st.subheader("Weekoff preferences (choose employees for each pattern)")
     weekoff_patterns = ["Friday-Saturday","Sunday-Monday","Saturday-Sunday",
                         "Monday-Tuesday","Tuesday-Wednesday","Wednesday-Thursday","Thursday-Friday"]
-    weekoff_selection = {pattern: st.multiselect(pattern, employees) for pattern in weekoff_patterns}
+    weekoff_assignments = {}
+    for pattern in weekoff_patterns:
+        weekoff_assignments[pattern] = st.multiselect(pattern, employees)
 
+    # Festival days
     st.subheader("Festival / Common holidays (optional)")
     festival_days = st.multiselect("Festival days (1..n)", list(range(1, num_days+1)))
 
     st.subheader("Coverage constraints")
     max_night_per_day = st.number_input("Max people on Night (N) per day", min_value=1, max_value=10, value=2)
-    target_morning = st.number_input("Target people on Morning (F) per day", min_value=1, max_value=10, value=3)
-    target_second = st.number_input("Target people on Second (S) per day", min_value=1, max_value=10, value=3)
+    target_morning = st.number_input("Max people on Morning (F) per day", min_value=1, max_value=10, value=3)
+    target_second = st.number_input("Max people on Second (S) per day", min_value=1, max_value=10, value=4)
     max_nights_per_person = st.number_input("Max nights per person in month", min_value=0, max_value=num_days, value=6)
 
-    st.info("Coverage pool members (these staff will be assigned to meet daily F/S/N targets):")
-    st.write(", ".join(coverage_pool))
-
     if st.button("Generate 24/7 Shift + Leave Plan"):
-        # --------------------------
-        # Step A: Initialize blank plan
-        # --------------------------
-        plan = {emp: ['']*num_days for emp in employees}
+        plan = {emp:['']*num_days for emp in employees}
 
-        # Apply weekoffs
-        for pattern, members in weekoff_selection.items():
+        # --------------------------
+        # Apply weekoffs consistently
+        for pattern, members in weekoff_assignments.items():
             days = get_weekoff_days_for_pattern(year, month, pattern)
             for emp in members:
                 for d in days:
                     plan[emp][d-1] = 'O'
 
-        # Apply festival days
+        # Festival days
         for emp in employees:
             for f in festival_days:
                 plan[emp][f-1] = 'H'
 
-        # Group3 fixed shifts
-        fixed_shifts_g3 = {
-            "Ramesh Polisetty": "G",
-            "Srinivasu Cheedalla": "E",
-            "Gangavarapu Suneetha": "G",
-            "Lakshmi Narayana Rao": "G"
-        }
+        # --------------------------
+        # Fixed shifts for group3 and group4
+        fixed_shifts_g3 = {"Ramesh Polisetty":"G","Srinivasu Cheedalla":"E",
+                           "Gangavarapu Suneetha":"G","Lakshmi Narayana Rao":"G"}
         for emp, sh in fixed_shifts_g3.items():
             for d in range(num_days):
-                if plan[emp][d] == '':
+                if plan[emp][d]=='':
                     plan[emp][d] = sh
-
-        # Group4 always S
         for emp in group4:
             for d in range(num_days):
-                if plan[emp][d] == '':
-                    plan[emp][d] = 'S'
+                if plan[emp][d]=='':
+                    plan[emp][d]='S'
 
-        # Group1 rotation F->S->N
+        # Group1 rotation F->S->N after O/H
         cycle_g1 = ['F','S','N']
         for emp_idx, emp in enumerate(group1):
             idx = emp_idx
             for d in range(num_days):
                 if plan[emp][d] in ['O','H']:
-                    idx = (idx + 1) % 3
-                elif plan[emp][d] == '':
-                    plan[emp][d] = cycle_g1[idx % 3]
+                    idx = (idx+1)%3
+                elif plan[emp][d]=='':
+                    plan[emp][d] = cycle_g1[idx%3]
 
         # Group2 rotation (Imran no N)
-        cycle_g2 = ['F','S','N']
-        for emp in group2:
-            if emp == "Imran Khan":
-                cycle_imran = ['F','S']
-                idx = 0
+        for emp_idx, emp in enumerate(group2):
+            if emp=='Imran Khan':
+                cycle_imran=['F','S']
+                idx=emp_idx
                 for d in range(num_days):
                     if plan[emp][d] in ['O','H']:
-                        idx = (idx + 1) % 2
-                    elif plan[emp][d] == '':
-                        plan[emp][d] = cycle_imran[idx % 2]
+                        idx=(idx+1)%2
+                    elif plan[emp][d]=='':
+                        plan[emp][d]=cycle_imran[idx%2]
             else:
-                idx = 0
+                idx=emp_idx
                 for d in range(num_days):
                     if plan[emp][d] in ['O','H']:
-                        idx = (idx + 1) % 3
-                    elif plan[emp][d] == '':
-                        plan[emp][d] = cycle_g2[idx % 3]
+                        idx=(idx+1)%3
+                    elif plan[emp][d]=='':
+                        plan[emp][d]=cycle_g1[idx%3]
 
         # --------------------------
-        # Step B: Assign coverage pool fairly
-        # --------------------------
-        night_count = {emp: sum(1 for v in plan[emp] if v=='N') for emp in employees}
-        shift_count = {emp: {'F':sum(1 for v in plan[emp] if v=='F'),
-                             'S':sum(1 for v in plan[emp] if v=='S'),
-                             'N':night_count[emp]} for emp in employees}
+        # Coverage pool assignment (respect max F/S/N per day)
+        night_count = {e:0 for e in employees}
+        for e in employees:
+            night_count[e] = sum(1 for v in plan[e] if v=='N')
+
+        rng = np.random.default_rng(seed=(year*100+month))
 
         for d in range(num_days):
-            blanks = [e for e in coverage_pool if plan[e][d] == '']
-            np.random.shuffle(blanks)
+            # Skip H/O already applied
+            n_N = count_shift_on_day(plan,d,'N')
+            n_F = count_shift_on_day(plan,d,'F')
+            n_S = count_shift_on_day(plan,d,'S')
+            need_N = max(0, max_night_per_day - n_N)
+            need_F = max(0, target_morning - n_F)
+            need_S = max(0, target_second - n_S)
 
-            # Nights
-            needN = max(0, max_night_per_day - count_shift_on_day(plan,d,'N'))
-            night_candidates = sorted([e for e in blanks if shift_count[e]['N'] < max_nights_per_person and e != "Imran Khan"], 
-                                      key=lambda x: shift_count[x]['N'])
-            for e in night_candidates[:needN]:
-                plan[e][d] = 'N'
-                shift_count[e]['N'] += 1
-                blanks.remove(e)
+            available = [e for e in coverage_pool if plan[e][d]=='']
+            if len(available)<(need_N+need_F+need_S):
+                extras = [e for e in employees if plan[e][d]=='' and e not in fixed_employees and e not in available]
+                available+=extras
+            available = list(rng.permutation(available))
 
-            # F
-            needF = max(0, target_morning - count_shift_on_day(plan,d,'F'))
-            f_candidates = sorted(blanks, key=lambda x: shift_count[x]['F'])
-            for e in f_candidates[:needF]:
-                plan[e][d] = 'F'
-                shift_count[e]['F'] += 1
-                blanks.remove(e)
+            # Assign N first
+            n_assigned=0
+            for _ in range(need_N):
+                candidate=None
+                sorted_candidates=sorted([e for e in available if night_count[e]<max_nights_per_person and e!='Imran Khan'],
+                                         key=lambda x:(night_count[x],rng.integers(0,1000)))
+                if sorted_candidates:
+                    candidate=sorted_candidates[0]
+                if candidate:
+                    plan[candidate][d]='N'
+                    night_count[candidate]+=1
+                    available.remove(candidate)
+                    n_assigned+=1
 
-            # S
-            needS = max(0, target_second - count_shift_on_day(plan,d,'S'))
-            s_candidates = sorted(blanks, key=lambda x: shift_count[x]['S'])
-            for e in s_candidates[:needS]:
-                plan[e][d] = 'S'
-                shift_count[e]['S'] += 1
-                blanks.remove(e)
+            # Assign F
+            for _ in range(need_F):
+                if not available: break
+                plan[available[0]][d]='F'
+                available.pop(0)
 
-            # Remaining blanks -> assign S
-            for e in blanks:
-                plan[e][d] = 'S'
-                shift_count[e]['S'] += 1
+            # Assign S
+            for _ in range(need_S):
+                if not available: break
+                plan[available[0]][d]='S'
+                available.pop(0)
 
-        # Ensure no blanks remain
-        for e in employees:
-            for d in range(num_days):
-                if plan[e][d] == '':
-                    plan[e][d] = 'S'
+            # Fill remaining blanks
+            for e in [x for x in employees if plan[x][d]=='']:
+                plan[e][d]='S'
 
-        # Save
-        df_plan = pd.DataFrame(plan, index=dates).T
-        st.session_state['final_plan'] = df_plan
-        st.success("Plan generated. Switch to 'Final Plan & Summary' tab to view and download.")
+        df_plan = pd.DataFrame(plan,index=dates).T
+        st.session_state['final_plan']=df_plan
+        st.success("Plan generated. Switch to 'Final Plan & Summary' tab.")
 
-# --------------------------
-# TAB 2: Individual Leave
-# --------------------------
 with tab2:
     st.header("Individual leave / ad-hoc adjustments")
     if 'final_plan' not in st.session_state:
-        st.warning("Please generate a plan first under 'Config & Generate' tab.")
+        st.warning("Generate a plan first.")
     else:
         df = st.session_state['final_plan']
         emp = st.selectbox("Employee", employees)
         day = st.multiselect("Select date(s) to mark as Individual Leave (L)", df.columns.tolist())
         if st.button("Apply Individual Leave"):
             for d in day:
-                df.loc[emp, d] = 'L'
-            st.session_state['final_plan'] = df
-            st.success(f"Applied individual leave for {emp} on {', '.join(day)}")
+                df.loc[emp,d]='L'
+            st.session_state['final_plan']=df
+            st.success(f"Applied individual leave for {emp}")
 
-# --------------------------
-# TAB 3: Final Plan & Summary
-# --------------------------
 with tab3:
     st.header("Final Shift Plan and Summary")
     if 'final_plan' not in st.session_state:
         st.warning("No plan available. Generate first.")
     else:
-        df_plan = st.session_state['final_plan']
+        df_plan=st.session_state['final_plan']
 
-        # Coloring
         def color_map(val):
-            cmap = {'F':'lightgreen','S':'lightblue','N':'lightpink',
-                    'G':'gold','E':'violet','O':'lightgray','H':'orange','L':'red'}
+            cmap={'F':'lightgreen','S':'lightblue','N':'lightpink','G':'gold','E':'violet','O':'lightgray','H':'orange','L':'red'}
             return f'background-color: {cmap.get(val,"")}'
-        st.dataframe(df_plan.style.applymap(color_map), height=600)
+        st.dataframe(df_plan.style.applymap(color_map),height=600)
 
-        # Summary counts
-        summary = pd.DataFrame({sh:[sum(1 for v in df_plan.loc[e] if v==sh) for e in df_plan.index] 
-                                for sh in ['F','S','N','G','E','O','H','L']}, index=df_plan.index)
+        summary=pd.DataFrame({sh:[sum(1 for v in df_plan.loc[e] if v==sh) for e in df_plan.index] for sh in ['F','S','N','G','E','O','H','L']},index=df_plan.index)
         st.subheader("Per-person shift counts this month")
         st.dataframe(summary)
 
-        # Daily coverage
-        daily_counts = pd.DataFrame({
-            'Date': df_plan.columns,
-            'F':[sum(1 for e in df_plan.index if df_plan.loc[e,c]=='F') for c in df_plan.columns],
-            'S':[sum(1 for e in df_plan.index if df_plan.loc[e,c]=='S') for c in df_plan.columns],
-            'N':[sum(1 for e in df_plan.index if df_plan.loc[e,c]=='N') for c in df_plan.columns],
-            'O/H/L':[sum(1 for e in df_plan.index if df_plan.loc[e,c] in ('O','H','L')) for c in df_plan.columns]
-        })
+        daily_counts=pd.DataFrame({'Date':df_plan.columns,
+                                   'F':[sum(1 for e in df_plan.index if df_plan.loc[e,col]=='F') for col in df_plan.columns],
+                                   'S':[sum(1 for e in df_plan.index if df_plan.loc[e,col]=='S') for col in df_plan.columns],
+                                   'N':[sum(1 for e in df_plan.index if df_plan.loc[e,col]=='N') for col in df_plan.columns],
+                                   'O/H/L':[sum(1 for e in df_plan.index if df_plan.loc[e,col] in ('O','H','L')) for col in df_plan.columns]})
         st.subheader("Daily coverage summary")
         st.dataframe(daily_counts)
 
-        # Download CSV
-        csv = df_plan.to_csv().encode('utf-8')
-        st.download_button("Download CSV", csv, file_name=f"final_shift_plan_{year}_{month:02d}.csv")
-
-        st.info("Algorithm respects weekoffs, festivals, individual leaves, fixed shifts, and daily F/S/N coverage while distributing night shifts fairly.")
+        csv=df_plan.to_csv().encode('utf-8')
+        st.download_button("Download CSV",csv,file_name=f"final_shift_plan_{year}_{month:02d}.csv")
