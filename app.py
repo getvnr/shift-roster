@@ -34,50 +34,49 @@ with tab1:
     max_morning = st.number_input("Max Morning (F) per day", 2, 3, 3)
     min_second = st.number_input("Min Second (S) per day", 3, 4, 3)
     max_second = st.number_input("Max Second (S) per day", 3, 4, 4)
+    max_night_per_day = st.number_input("Max Night per day", 1, 5, 2)
 
     if st.button("Generate 24/7 Roster"):
         plan = pd.DataFrame('', index=employees, columns=dates)
         night_count = {emp:0 for emp in employees}
+        rng = np.random.default_rng(seed=(year*100+month))
 
         # Weekends
         weekends = get_weekends(year, month)
 
-        # Assign shifts in rotation for each employee until weekly off
-        shift_cycle = ['F','S','N']
-        rng = np.random.default_rng(seed=(year*100+month))
-        for emp in employees:
-            day_idx = 0
-            shift_idx = rng.integers(0,3)  # random starting shift
-            while day_idx < num_days:
-                # Determine consecutive working days (4-5)
-                consec_days = rng.integers(4,6)
-                for _ in range(consec_days):
-                    if day_idx >= num_days:
-                        break
-                    date = dates[day_idx]
-                    if day_idx+1 in weekends:
-                        plan.loc[emp, date] = 'O'  # weekly off
-                    elif day_idx+1 in festival_days:
-                        plan.loc[emp, date] = 'H'
-                    else:
-                        # Assign shift
-                        shift = shift_cycle[shift_idx]
-                        if shift=='N' and night_count[emp]>=max_night_per_person:
-                            # switch to F or S if night limit reached
-                            shift = 'F' if rng.integers(0,2)==0 else 'S'
-                        plan.loc[emp, date] = shift
-                        if shift=='N':
-                            night_count[emp]+=1
-                    day_idx +=1
-                # Add 2-day off after consecutive working days
-                for off_day in range(2):
-                    if day_idx>=num_days:
-                        break
-                    date = dates[day_idx]
+        # Initialize daily coverage counts
+        for d_idx, date in enumerate(dates):
+            assigned_N = 0
+            assigned_F = 0
+            assigned_S = 0
+            # assign shifts sequentially to ensure coverage
+            shuffled_emps = list(rng.permutation(employees))
+            for emp in shuffled_emps:
+                # Skip if already assigned
+                if plan.loc[emp, date] != '':
+                    continue
+                # Weekend
+                if d_idx+1 in weekends:
                     plan.loc[emp, date] = 'O'
-                    day_idx +=1
-                # Rotate shift after off
-                shift_idx = (shift_idx+1)%3
+                elif d_idx+1 in festival_days:
+                    plan.loc[emp, date] = 'H'
+                else:
+                    # Assign Night if limit not reached
+                    if assigned_N < max_night_per_day and night_count[emp] < max_night_per_person:
+                        plan.loc[emp, date] = 'N'
+                        night_count[emp] += 1
+                        assigned_N +=1
+                    # Assign F if not reached
+                    elif assigned_F < max_morning:
+                        plan.loc[emp, date] = 'F'
+                        assigned_F +=1
+                    # Assign S if not reached
+                    elif assigned_S < max_second:
+                        plan.loc[emp, date] = 'S'
+                        assigned_S +=1
+                    else:
+                        # extra assignment to ensure 24/7
+                        plan.loc[emp, date] = 'S'
 
         st.session_state['final_plan'] = plan
         st.success("24/7 Roster generated successfully!")
@@ -115,9 +114,11 @@ with tab3:
             'N':[sum(1 for v in df_plan.loc[e] if v=='N') for e in df_plan.index],
             'O':[sum(1 for v in df_plan.loc[e] if v=='O') for e in df_plan.index],
             'H':[sum(1 for v in df_plan.loc[e] if v=='H') for e in df_plan.index],
-            'L':[sum(1 for v in df_plan.loc[e] if v=='L') for e in df_plan.index]
+            'L':[sum(1 for v in df_plan.loc[e] if v=='L') for e in df_plan.index],
+            'Working Days':[sum(1 for v in df_plan.loc[e] if v in ['F','S','N']) for e in df_plan.index],
+            'Week Off':[sum(1 for v in df_plan.loc[e] if v=='O') for e in df_plan.index]
         }, index=df_plan.index)
-        st.subheader("Per-person shift counts this month")
+        st.subheader("Per-person shift counts, working days & week offs")
         st.dataframe(summary)
 
         daily_counts = pd.DataFrame({
