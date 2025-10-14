@@ -3,11 +3,11 @@ import pandas as pd
 import numpy as np
 from calendar import monthrange, weekday
 
-# --- Page Config ---
+# --- Streamlit Config ---
 st.set_page_config(layout="wide")
-st.title("Employee Leave & Shift Plan Generator (Persistent Opposite Shifts)")
+st.title("Employee Leave + Shift Plan Generator")
 
-# --- Default Employees ---
+# --- Default Employee Data ---
 employee_data = pd.DataFrame([
     ["Gopalakrishnan Selvaraj", "IIS"],
     ["Paneerselvam F", "IIS"],
@@ -39,165 +39,99 @@ employee_data = pd.DataFrame([
 
 employees = employee_data["Name"].tolist()
 
-# --- Weekoff Preferences ---
-st.subheader("Weekoff Preferences")
-friday_saturday_off = st.multiselect("Friday-Saturday Off", employees, default=[])
-sunday_monday_off = st.multiselect("Sunday-Monday Off", employees, default=[])
-saturday_sunday_off = st.multiselect("Saturday-Sunday Off", employees, default=[])
-tuesday_wednesday_off = st.multiselect("Tuesday-Wednesday Off", employees, default=[])
-thursday_friday_off = st.multiselect("Thursday-Friday Off", employees, default=[])
-wednesday_thursday_off = st.multiselect("Wednesday-Thursday Off", employees, default=[])
-monday_tuesday_off = st.multiselect("Monday-Tuesday Off", employees, default=[])
-
-# --- Validate Overlaps ---
-groups = [friday_saturday_off, sunday_monday_off, saturday_sunday_off,
-          tuesday_wednesday_off, thursday_friday_off, wednesday_thursday_off, monday_tuesday_off]
-names = ["Fri-Sat", "Sun-Mon", "Sat-Sun", "Tue-Wed", "Thu-Fri", "Wed-Thu", "Mon-Tue"]
-for i in range(len(groups)):
-    for j in range(i + 1, len(groups)):
-        overlap = set(groups[i]) & set(groups[j])
-        if overlap:
-            st.error(f"Employees in both {names[i]} & {names[j]}: {', '.join(overlap)}")
-            st.stop()
-
-# --- Month & Year ---
-year = st.number_input("Year", min_value=2023, max_value=2100, value=2025)
-month = st.selectbox("Month", list(range(1, 13)), index=9, format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B'))
-num_days = monthrange(year, month)[1]
-dates = [f"{day:02d}-{month:02d}-{year}" for day in range(1, num_days + 1)]
-
-# --- Festival Days ---
-festival_days = st.multiselect("Festival Days", list(range(1, num_days + 1)), default=[])
-
-# --- Helper Function ---
-def get_weekdays(year, month, weekday_indices):
-    return [d for d in range(1, monthrange(year, month)[1] + 1) if weekday(year, month, d) in weekday_indices]
-
-# Weekday mapping
-fridays_saturdays = get_weekdays(year, month, [4, 5])
-sundays_mondays = get_weekdays(year, month, [6, 0])
-saturdays_sundays = get_weekdays(year, month, [5, 6])
-tuesday_wednesday = get_weekdays(year, month, [1, 2])
-thursday_friday = get_weekdays(year, month, [3, 4])
-wednesday_thursday = get_weekdays(year, month, [2, 3])
-monday_tuesday = get_weekdays(year, month, [0, 1])
-
-# Calculate weekends & working days
-saturdays = get_weekdays(year, month, [5])
-sundays = get_weekdays(year, month, [6])
-num_saturdays = len(saturdays)
-num_sundays = len(sundays)
-num_weekends = num_saturdays + num_sundays
-num_working_days = num_days - num_weekends - len(festival_days)
-
-# --- Month Summary ---
-st.subheader("Month Summary")
-st.write(f"Number of Saturdays: {num_saturdays}")
-st.write(f"Number of Sundays: {num_sundays}")
-st.write(f"Total Working Days (excluding weekends and festivals): {num_working_days}")
-
-# --- Leave Plan Generation ---
-def generate_leave_plan(target_offs=8):
-    roster = {emp: [''] * num_days for emp in employees}
-    festival_set = set([d - 1 for d in festival_days])
-
-    for emp in employees:
-        off_idx = set()
-        if emp in friday_saturday_off:
-            off_idx.update([d - 1 for d in fridays_saturdays])
-        if emp in sunday_monday_off:
-            off_idx.update([d - 1 for d in sundays_mondays])
-        if emp in saturday_sunday_off:
-            off_idx.update([d - 1 for d in saturdays_sundays])
-        if emp in tuesday_wednesday_off:
-            off_idx.update([d - 1 for d in tuesday_wednesday])
-        if emp in thursday_friday_off:
-            off_idx.update([d - 1 for d in thursday_friday])
-        if emp in wednesday_thursday_off:
-            off_idx.update([d - 1 for d in wednesday_thursday])
-        if emp in monday_tuesday_off:
-            off_idx.update([d - 1 for d in monday_tuesday])
-
-        for idx in off_idx:
-            if 0 <= idx < num_days:
-                roster[emp][idx] = 'O'
-        for idx in festival_set:
-            roster[emp][idx] = 'H'
-
-    # Equalize total offs
-    for emp, days in roster.items():
-        current_offs = [i for i, v in enumerate(days) if v == 'O']
-        diff = len(current_offs) - target_offs
-
-        if diff > 0:
-            for idx in current_offs[-diff:]:
-                roster[emp][idx] = ''
-        elif diff < 0:
-            working_days = [i for i, v in enumerate(days) if v == '']
-            if len(working_days) >= abs(diff):
-                add_days = np.random.choice(working_days, abs(diff), replace=False)
-                for idx in add_days:
-                    roster[emp][idx] = 'O'
-
-    return roster
-
-# --- Generate Leave Plan ---
-target_offs = st.slider("Target Off Days per Employee", min_value=6, max_value=12, value=8)
-roster_dict = generate_leave_plan(target_offs)
-
-# --- Persistent Opposite Shift Logic for Group1 ---
+# --- Group1 Opposite Shift Members ---
 group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-shift_cycle = ['F', 'S', 'N']  # order for rotation
-shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in group1}
+shift_cycle = ["F", "S", "N"]  # Opposite shifts
 
-# Assign initial opposite shifts
-current_shifts = dict(zip(group1, shift_cycle))
+# --- Month Selection ---
+year = st.number_input("Year", min_value=2023, max_value=2100, value=2025)
+month = st.selectbox(
+    "Month", list(range(1, 13)),
+    index=9,
+    format_func=lambda x: pd.Timestamp(year, x, 1).strftime('%B')
+)
+num_days = monthrange(year, month)[1]
+dates = [pd.Timestamp(year, month, d).strftime("%d-%b-%Y") for d in range(1, num_days + 1)]
 
-for day in range(num_days):
-    # Check if all are off or holiday on this day
-    if all(roster_dict[emp][day] in ['O', 'H'] for emp in group1):
-        continue
+# --- Auto Detect Weekends ---
+def get_weekday_days(year, month, weekday_indices):
+    return [d for d in range(1, monthrange(year, month)[1] + 1)
+            if weekday(year, month, d) in weekday_indices]
 
-    # Apply current shifts to working days
+saturdays = get_weekday_days(year, month, [5])
+sundays = get_weekday_days(year, month, [6])
+weekends = set(saturdays + sundays)
+
+# --- Festival Days (Optional Manual Selection) ---
+festival_days = st.multiselect(
+    "Festival Days (Optional)",
+    list(range(1, num_days + 1)),
+    default=[]
+)
+festival_set = set(festival_days)
+
+# --- Generate Shift Plan ---
+def generate_shift_plan():
+    plan = {emp: [''] * num_days for emp in employees}
+
+    # Assign Group1 opposite shifts that change only after weekoff
+    shift_index = 0
     for emp in group1:
-        if roster_dict[emp][day] not in ['O', 'H']:
-            roster_dict[emp][day] = current_shifts[emp]
-            shift_counts[emp][current_shifts[emp]] += 1
+        current_shift = shift_cycle[shift_index]
+        for day in range(1, num_days + 1):
+            if day in weekends:
+                plan[emp][day - 1] = "O"
+                # rotate to next shift after weekoff
+                if day == num_days or (day + 1 not in weekends):
+                    shift_index = (shift_index + 1) % 3
+                    current_shift = shift_cycle[shift_index]
+            else:
+                plan[emp][day - 1] = current_shift
+        shift_index = (shift_index + 1) % 3
 
-    # Detect if anyone has weekoff/holiday today → trigger next rotation for next working day
-    if any(roster_dict[emp][day] in ['O', 'H'] for emp in group1):
-        # Rotate shifts (F→S→N→F)
-        shift_cycle = shift_cycle[1:] + shift_cycle[:1]
-        current_shifts = dict(zip(group1, shift_cycle))
+    # Assign rest employees with default S shift except weekends
+    for emp in employees:
+        if emp not in group1:
+            for day in range(1, num_days + 1):
+                if day in weekends:
+                    plan[emp][day - 1] = "O"
+                elif day in festival_set:
+                    plan[emp][day - 1] = "H"
+                else:
+                    plan[emp][day - 1] = np.random.choice(["F", "S", "N"])
 
-# --- Convert to DataFrame ---
-df_roster = pd.DataFrame(roster_dict, index=dates).T
+    return plan
+
+# --- Generate Plan ---
+shift_plan = generate_shift_plan()
+df_plan = pd.DataFrame(shift_plan, index=dates).T
 
 # --- Color Coding ---
-def color_leaves(val):
-    colors = {
-        'O': 'lightgray', 
-        'H': 'orange',
-        'F': '#90EE90',   # Light green
-        'S': '#ADD8E6',   # Light blue
-        'N': '#DDA0DD'    # Light purple
+def color_shifts(val):
+    color_map = {
+        'F': 'lightgreen',
+        'S': 'lightblue',
+        'N': 'lightpink',
+        'O': 'lightgray',
+        'H': 'orange'
     }
-    return f'background-color: {colors.get(val, "")}'
+    return f'background-color: {color_map.get(val, "")}'
 
-st.subheader("Employee Leave & Shift Plan")
-st.dataframe(df_roster.style.applymap(color_leaves), height=600)
+# --- Display Shift Plan ---
+st.subheader("Employee Shift Plan")
+st.dataframe(df_plan.style.applymap(color_shifts), height=600)
 
-# --- Leave & Shift Summary ---
-st.subheader("Leave & Shift Summary")
+# --- Summary Table ---
 summary = pd.DataFrame({
-    'Off Days (O)': [sum(1 for v in roster_dict[e] if v == 'O') for e in employees],
-    'Holidays (H)': [sum(1 for v in roster_dict[e] if v == 'H') for e in employees],
-    'F Days': [sum(1 for v in roster_dict[e] if v == 'F') for e in employees],
-    'S Days': [sum(1 for v in roster_dict[e] if v == 'S') for e in employees],
-    'N Days': [sum(1 for v in roster_dict[e] if v == 'N') for e in employees]
+    "F Shift": [sum(1 for v in shift_plan[e] if v == 'F') for e in employees],
+    "S Shift": [sum(1 for v in shift_plan[e] if v == 'S') for e in employees],
+    "N Shift": [sum(1 for v in shift_plan[e] if v == 'N') for e in employees],
+    "Off (O)": [sum(1 for v in shift_plan[e] if v == 'O') for e in employees],
+    "Holidays (H)": [sum(1 for v in shift_plan[e] if v == 'H') for e in employees],
 }, index=employees)
+st.subheader("Shift Summary")
 st.dataframe(summary)
 
 # --- Download CSV ---
-csv = df_roster.to_csv().encode('utf-8')
-st.download_button("Download Leave & Shift Plan CSV", csv, f"leave_shift_plan_{year}_{month:02d}.csv")
+csv = df_plan.to_csv().encode('utf-8')
+st.download_button("Download Shift Plan CSV", csv, f"shift_plan_{year}_{month:02d}.csv")
