@@ -1,4 +1,3 @@
-# full_streamlit_shift_planner_v3.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,33 +6,17 @@ from calendar import monthrange, weekday
 st.set_page_config(layout="wide", page_title="Employee Leave & Shift Planner")
 st.title("Employee Leave & Shift Planner — 24/7 Coverage")
 
-# --------------------------
-# Employee Definition (only 13 engineers)
-# --------------------------
+# Employees
 employees = [
-    "Pousali C",
-    "B Madhurusha",
-    "Chinthalapudi Yaswanth",
-    "Edagotti Kalpana",
-    "Thorat Yashwant",
-    "Srivastav Nitin",
-    "Kishore Khati Vaibhav",
-    "Rupan Venkatesan Anandha",
-    "Chaudhari Kaustubh",
-    "Shejal Gawade",
-    "Vivek Kushwaha",
-    "Abdul Mukthiyar Basha",
-    "M Naveen"
+    "Pousali C","B Madhurusha","Chinthalapudi Yaswanth","Edagotti Kalpana",
+    "Thorat Yashwant","Srivastav Nitin","Kishore Khati Vaibhav","Rupan Venkatesan Anandha",
+    "Chaudhari Kaustubh","Shejal Gawade","Vivek Kushwaha","Abdul Mukthiyar Basha","M Naveen"
 ]
 
-# --------------------------
-# UI: Tabs
-# --------------------------
+# Tabs
 tab1, tab2, tab3 = st.tabs(["🗓️ Config & Generate", "🙋 Individual Leave", "📊 Final Plan & Summary"])
 
-# --------------------------
 # Helpers
-# --------------------------
 def get_weekdays(year, month, weekday_indices):
     return [d for d in range(1, monthrange(year, month)[1]+1) if weekday(year, month, d) in weekday_indices]
 
@@ -42,22 +25,16 @@ def get_weekoff_days(year, month):
     sundays = get_weekdays(year, month, [6])
     return sorted(saturdays + sundays)
 
-# --------------------------
-# TAB 1: Configuration & Generate
-# --------------------------
+# TAB 1
 with tab1:
     st.header("Step 1 — Configure month & generate roster")
-
-    year = st.number_input("Year", min_value=2023, max_value=2100, value=2025)
-    month = st.selectbox("Month", list(range(1,13)), index=9,
-                         format_func=lambda x: pd.Timestamp(year,x,1).strftime("%B"))
+    year = st.number_input("Year", 2023, 2100, 2025)
+    month = st.selectbox("Month", range(1,13), index=9, format_func=lambda x: pd.Timestamp(year,x,1).strftime("%B"))
     num_days = monthrange(year, month)[1]
     dates = [pd.Timestamp(year, month, d).strftime("%d-%b-%Y") for d in range(1, num_days+1)]
 
-    st.subheader("Festival / Common holidays (optional)")
     festival_days = st.multiselect("Festival days (1..n)", list(range(1, num_days+1)))
 
-    st.subheader("Coverage constraints")
     max_night_per_day = st.number_input("Max Night (N) per day", 1, 10, 2)
     min_morning = st.number_input("Min Morning (F) per day", 1, 10, 2)
     max_morning = st.number_input("Max Morning (F) per day", 1, 10, 3)
@@ -66,60 +43,48 @@ with tab1:
     max_nights_per_person = st.number_input("Max nights per person per month", 0, num_days, 5)
 
     if st.button("Generate 24/7 Shift Plan"):
-        plan = {emp: ['']*num_days for emp in employees}
-        night_count = {emp: 0 for emp in employees}
+        plan = pd.DataFrame('', index=employees, columns=dates)
+        night_count = {emp:0 for emp in employees}
 
         # Apply weekend offs
         weekoff_days = get_weekoff_days(year, month)
         for emp in employees:
             for d in weekoff_days:
-                plan[emp][d-1] = 'O'
+                plan.loc[emp, dates[d-1]] = 'O'
 
         # Apply festival days
         for emp in employees:
             for f in festival_days:
-                plan[emp][f-1] = 'H'
+                plan.loc[emp, dates[f-1]] = 'H'
 
         rng = np.random.default_rng(seed=(year*100 + month))
 
-        for d in range(num_days):
-            available = [e for e in employees if plan[e][d] == '']
+        for d_idx, date in enumerate(dates):
+            available = [e for e in employees if plan.loc[e,date]=='']
 
-            # Assign Night shifts first
-            def pick_night(candidates):
-                candidates = [e for e in candidates if night_count[e] < max_nights_per_person]
-                candidates_sorted = sorted(candidates, key=lambda x: night_count[x])
-                return candidates_sorted[:max_night_per_day]
-
-            night_assigned = pick_night(available)
+            # Assign Night
+            candidates = [e for e in available if night_count[e] < max_nights_per_person]
+            candidates_sorted = sorted(candidates, key=lambda x: night_count[x])
+            night_assigned = candidates_sorted[:max_night_per_day]
             for e in night_assigned:
-                plan[e][d] = 'N'
+                plan.loc[e,date] = 'N'
                 night_count[e] += 1
             available = [e for e in available if e not in night_assigned]
 
-            # Assign Morning F
+            # Assign Morning
             n_morning = min(max_morning, len(available))
             for e in available[:n_morning]:
-                plan[e][d] = 'F'
-            available = [e for e in available if plan[e][d] == '']
+                plan.loc[e,date] = 'F'
+            available = [e for e in available if plan.loc[e,date]=='']
 
-            # Assign Second S
+            # Assign Second
             for e in available:
-                plan[e][d] = 'S'
+                plan.loc[e,date] = 'S'
 
-        # Safety fill
-        for emp in employees:
-            for d in range(num_days):
-                if plan[emp][d] == '':
-                    plan[emp][d] = 'S'
+        st.session_state['final_plan'] = plan
+        st.success("Shift plan generated!")
 
-        df_plan = pd.DataFrame(plan, index=employees, columns=dates)
-        st.session_state['final_plan'] = df_plan
-        st.success("Shift plan generated! Check 'Final Plan & Summary' tab.")
-
-# --------------------------
-# TAB 2: Individual Leave
-# --------------------------
+# TAB 2
 with tab2:
     st.header("Individual leave / ad-hoc adjustments")
     if 'final_plan' not in st.session_state:
@@ -134,9 +99,7 @@ with tab2:
             st.session_state['final_plan'] = df
             st.success(f"Applied individual leave for {emp} on {', '.join(day)}")
 
-# --------------------------
-# TAB 3: Final Plan & Summary
-# --------------------------
+# TAB 3
 with tab3:
     st.header("Final Shift Plan and Summary")
     if 'final_plan' not in st.session_state:
@@ -149,7 +112,6 @@ with tab3:
             return f'background-color: {cmap.get(val,"")}'
         st.dataframe(df_plan.style.applymap(color_map), height=600)
 
-        # Per-person counts
         summary = pd.DataFrame({
             'F':[sum(1 for v in df_plan.loc[e] if v=='F') for e in df_plan.index],
             'S':[sum(1 for v in df_plan.loc[e] if v=='S') for e in df_plan.index],
@@ -161,7 +123,6 @@ with tab3:
         st.subheader("Per-person shift counts this month")
         st.dataframe(summary)
 
-        # Daily coverage
         daily_counts = pd.DataFrame({
             'Date': df_plan.columns,
             'F':[sum(1 for e in df_plan.index if df_plan.loc[e,col]=='F') for col in df_plan.columns],
@@ -172,8 +133,5 @@ with tab3:
         st.subheader("Daily coverage summary")
         st.dataframe(daily_counts)
 
-        # Download
         csv = df_plan.to_csv().encode('utf-8')
         st.download_button("Download CSV", csv, file_name=f"final_shift_plan_{year}_{month:02d}.csv")
-
-        st.info("Max 5 nights/person, Night ≤2/day, Morning 2–3, Second 3–4, weekoffs equal weekends, festival days and individual leave applied.")
