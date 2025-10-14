@@ -41,25 +41,38 @@ employee_data = pd.DataFrame([
 
 employees = employee_data["Name"].tolist()
 
-# Groups
-group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]
-group3 = ["Ramesh Polisetty", "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao"]
-group4 = ["Muppa Divya", "Anil Athkuri", "D Namithananda"]
+# Groups (unchanged)
+group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]   # Opposite shifts F,S,N rotate after off
+group2 = ["Ajay Chidipotu", "Imran Khan", "Sammeta Balachander"]             # Opposite shifts but Imran no N
+group3 = ["Ramesh Polisetty", "Srinivasu Cheedalla", "Gangavarapu Suneetha", "Lakshmi Narayana Rao"]  # fixed G/E/G/G
+group4 = ["Muppa Divya", "Anil Athkuri", "D Namithananda"]                  # always S
 
+# --------------------------
+# Coverage pool (the people you listed) — they will be used to provide 24/7 coverage
+# --------------------------
 coverage_pool = [
-    "Pousali C", "B Madhurusha", "Chinthalapudi Yaswanth", "Edagotti Kalpana",
-    "Thorat Yashwant", "Srivastav Nitin", "Kishore Khati Vaibhav",
-    "Rupan Venkatesan Anandha", "Chaudhari Kaustubh", "Shejal Gawade", "Vivek Kushwaha"
+    "Pousali C",               # Group5
+    "B Madhurusha",            # Group5
+    "Chinthalapudi Yaswanth",  # Group5
+    "Edagotti Kalpana",        # Group6
+    "Thorat Yashwant",         # Group6
+    "Srivastav Nitin",         # Group7
+    "Kishore Khati Vaibhav",   # Group7
+    "Rupan Venkatesan Anandha",# Group8
+    "Chaudhari Kaustubh",      # Group8
+    "Shejal Gawade",           # Group9
+    "Vivek Kushwaha",          # Group9
+    "Abdul Mukthiyar Basha",   # Group10
+    "M Naveen"                 # Group10
 ]
 
 # --------------------------
-# UI Tabs
+# UI: Tabs
 # --------------------------
 tab1, tab2, tab3 = st.tabs(["🗓️ Config & Generate", "🙋 Individual Leave", "📊 Final Plan & Summary"])
 
 # --------------------------
-# Helper functions
+# Helpers: weekday / weekends
 # --------------------------
 def get_weekdays(year, month, weekday_indices):
     return [d for d in range(1, monthrange(year, month)[1] + 1) if weekday(year, month, d) in weekday_indices]
@@ -78,7 +91,7 @@ def get_weekoff_days_for_pattern(year, month, pattern):
     return [d for d in range(1, monthrange(year, month)[1] + 1) if weekday(year, month, d) in idxs]
 
 # --------------------------
-# TAB 1 — Config & Generate
+# TAB 1: Configuration & Generate
 # --------------------------
 with tab1:
     st.header("Step 1 — Configure month & weekoffs")
@@ -89,9 +102,10 @@ with tab1:
     num_days = monthrange(year, month)[1]
     dates = [pd.Timestamp(year, month, d).strftime("%d-%b-%Y") for d in range(1, num_days+1)]
 
+    # Auto-detect weekends
     saturdays = get_weekdays(year, month, [5])
     sundays = get_weekdays(year, month, [6])
-    st.markdown(f"**Auto-detected weekends:** Saturdays = {len(saturdays)}, Sundays = {len(sundays)}")
+    st.markdown(f"**Auto-detected:** Saturdays = {len(saturdays)}, Sundays = {len(sundays)}")
 
     st.subheader("Weekoff preferences (choose employees for each pattern)")
     friday_saturday_off = st.multiselect("Friday-Saturday", employees)
@@ -105,18 +119,28 @@ with tab1:
     st.subheader("Festival / Common holidays (optional)")
     festival_days = st.multiselect("Festival days (1..n)", list(range(1, num_days+1)))
 
-    # Default coverage rules (no UI input)
-    max_night_per_day = 2
-    target_morning = 3
-    target_second = 3
-    max_nights_per_person = 6
-
-    st.info("Coverage pool members (auto-assigned for daily F/S/N targets):")
+    st.info("Coverage pool members (these staff will be assigned to meet daily F/S/N targets):")
     st.write(", ".join(coverage_pool))
 
+    # --------------------------
+    # Default coverage constraints (applies to all days including weekends)
+    # Night max: 2
+    # Morning target: try 3 (acceptable 2-3)
+    # Second target: try 4 (acceptable 3-4)
+    # --------------------------
+    max_night_per_day = 2
+    target_morning = 3
+    target_second = 4
+    max_nights_per_person = 6
+
+    # Button to generate
     if st.button("Generate 24/7 Shift + Leave Plan"):
+        # --------------------------
+        # Step A: initialize plan with blanks, apply weekoffs and festival and group fixed shifts
+        # --------------------------
         plan = {emp: ['']*num_days for emp in employees}
 
+        # Apply weekoff patterns chosen by user (keeps behavior for other engineers unchanged)
         weekoff_groups = {
             "Friday-Saturday": friday_saturday_off,
             "Sunday-Monday": sunday_monday_off,
@@ -126,18 +150,18 @@ with tab1:
             "Wednesday-Thursday": wednesday_thursday_off,
             "Thursday-Friday": thursday_friday_off
         }
-
         for pattern, members in weekoff_groups.items():
             days = get_weekoff_days_for_pattern(year, month, pattern)
             for emp in members:
                 for d in days:
                     plan[emp][d-1] = 'O'
 
+        # Apply festival days
         for emp in employees:
             for f in festival_days:
                 plan[emp][f-1] = 'H'
 
-        # Group3 fixed shifts
+        # Group3 fixed shifts (unchanged)
         fixed_shifts_g3 = {
             "Ramesh Polisetty": "G",
             "Srinivasu Cheedalla": "E",
@@ -149,16 +173,17 @@ with tab1:
                 if plan[emp][d] == '':
                     plan[emp][d] = sh
 
-        # Group4 always S
+        # Group4 always S (unchanged)
         for emp in group4:
             for d in range(num_days):
                 if plan[emp][d] == '':
                     plan[emp][d] = 'S'
 
-        # Group1 rotation F→S→N
+        # Group1 rotation F->S->N rotate after off day (unchanged)
         cycle_g1 = ['F','S','N']
+        shift_index_g1 = 0
         for emp_idx, emp in enumerate(group1):
-            idx = emp_idx
+            idx = shift_index_g1 + emp_idx
             current_shift = cycle_g1[idx % 3]
             for d in range(num_days):
                 if plan[emp][d] in ['O','H']:
@@ -167,12 +192,13 @@ with tab1:
                 elif plan[emp][d] == '':
                     plan[emp][d] = current_shift
 
-        # Group2 rotation (Imran skips N)
+        # Group2 rotation but Imran no N (unchanged)
         cycle_g2 = ['F','S','N']
+        shift_index_g2 = 0
         for emp_idx, emp in enumerate(group2):
             if emp == "Imran Khan":
                 cycle_imran = ['F','S']
-                idx = emp_idx
+                idx = shift_index_g2 + emp_idx
                 current_shift = cycle_imran[idx % 2]
                 for d in range(num_days):
                     if plan[emp][d] in ['O','H']:
@@ -181,7 +207,7 @@ with tab1:
                     elif plan[emp][d] == '':
                         plan[emp][d] = current_shift
             else:
-                idx = emp_idx
+                idx = shift_index_g2 + emp_idx
                 current_shift = cycle_g2[idx % 3]
                 for d in range(num_days):
                     if plan[emp][d] in ['O','H']:
@@ -190,36 +216,92 @@ with tab1:
                     elif plan[emp][d] == '':
                         plan[emp][d] = current_shift
 
-        # Helper to count shift on day
+        # --------------------------
+        # NEW: Apply 5-on / 2-off cycle for coverage_pool members
+        # (Every 5 working days -> the next 2 days are marked O, repeating)
+        # This is applied AFTER explicit weekoff selections and festivals so those are respected.
+        # --------------------------
+        for emp in coverage_pool:
+            work_streak = 0
+            d = 0
+            while d < num_days:
+                # If day already O/H (user weekoff or festival), treat as off and do not count as work day.
+                if plan[emp][d] in ['O', 'H']:
+                    work_streak = 0
+                    d += 1
+                    continue
+                # If currently in work mode, assign blank (will be assigned shift later)
+                if work_streak < 5:
+                    # leave blank for now (assignment happens in pool allocation)
+                    work_streak += 1
+                    d += 1
+                else:
+                    # give two consecutive off days, if possible, mark as O (but don't override H)
+                    off_count = 0
+                    while off_count < 2 and d < num_days:
+                        if plan[emp][d] == '':
+                            plan[emp][d] = 'O'
+                            off_count += 1
+                            d += 1
+                        elif plan[emp][d] in ['O','H']:
+                            # if already off/holiday, still count it towards the two-day off
+                            off_count += 1
+                            d += 1
+                        else:
+                            # fixed shift day or similar (unlikely for coverage pool) — treat as work day and break the off loop
+                            break
+                    # reset streak and continue
+                    work_streak = 0
+
+        # --------------------------
+        # Step B: Assign flexible pool to meet daily targets
+        # Strategy (greedy):
+        # - For each day:
+        #   * respect existing assignments (O/H/L/G/E/S from fixed groups or weekoffs)
+        #   * determine how many more F, S, N are required to meet targets
+        #   * pick candidates from coverage_pool who are available and haven't exceeded max_nights_per_person
+        #   * prefer to distribute nights fairly among pool (choose people with lowest night count first)
+        #   * ensure daily N <= max_night_per_day
+        #   * if not enough pool members, fallback to other available employees (but we keep fixed groups unchanged)
+        # --------------------------
         def count_shift_on_day(pln, day_index, shift_code):
             return sum(1 for e in employees if pln[e][day_index] == shift_code)
 
-        # Assign coverage pool to fill F/S/N
-        night_count_by_person = {e: sum(1 for v in plan[e] if v == 'N') for e in employees}
+        # Initialize night counters
+        night_count_by_person = {emp: sum(1 for v in plan[emp] if v == 'N') for emp in employees}
+        # Fallback candidates = everyone except group3 fixed G/E and group4 fixed S (unchanged from previous logic)
         fallback_candidates = [e for e in employees if e not in group3 + group4]
+
+        # deterministic rng for fairness
         rng = np.random.default_rng(seed=(year*100 + month))
 
         for d in range(num_days):
+            # Skip days that are festival for everyone? H is per-person; treat H like O for assignment (do not force coverage if person is H)
             n_existing_N = count_shift_on_day(plan, d, 'N')
             n_existing_F = count_shift_on_day(plan, d, 'F')
             n_existing_S = count_shift_on_day(plan, d, 'S')
 
+            # compute needs: We try to meet target_morning and target_second but accept fewer if not enough staff available.
             need_N = max(0, max_night_per_day - n_existing_N)
             need_F = max(0, target_morning - n_existing_F)
             need_S = max(0, target_second - n_existing_S)
 
+            # Build candidate pool for this day: coverage_pool members who are available (blank)
             available = [e for e in coverage_pool if plan[e][d] == '']
+            # If not enough pool members available, include fallback candidates (this keeps other engineers unchanged where possible)
             if len(available) < (need_N + need_F + need_S):
                 extras = [e for e in fallback_candidates if plan[e][d] == '' and e not in available]
                 available += extras
+
             if available:
                 available = list(rng.permutation(available))
 
-            def pick_for_n(avail):
-                candidates = [e for e in avail if night_count_by_person.get(e,0) < max_nights_per_person and e != "Imran Khan"]
+            def pick_for_n(avail_list):
+                candidates = [e for e in avail_list if night_count_by_person.get(e,0) < max_nights_per_person and e != "Imran Khan"]
                 candidates_sorted = sorted(candidates, key=lambda x: (night_count_by_person.get(x,0), rng.integers(0,1000)))
                 return candidates_sorted[0] if candidates_sorted else None
 
+            # Assign Nights first (respect max limit)
             for _ in range(need_N):
                 candidate = pick_for_n(available)
                 if not candidate:
@@ -228,48 +310,63 @@ with tab1:
                     candidate = fallback[0] if fallback else None
                 if candidate:
                     plan[candidate][d] = 'N'
-                    night_count_by_person[candidate] += 1
+                    night_count_by_person[candidate] = night_count_by_person.get(candidate,0) + 1
                     if candidate in available:
                         available.remove(candidate)
 
+            # Assign F next (try to fill target_morning)
             for _ in range(need_F):
-                if not available: break
-                plan[available.pop(0)][d] = 'F'
+                if not available:
+                    break
+                candidate = available.pop(0)
+                plan[candidate][d] = 'F'
 
+            # Assign S next (try to fill target_second)
             for _ in range(need_S):
-                if not available: break
-                plan[available.pop(0)][d] = 'S'
+                if not available:
+                    break
+                candidate = available.pop(0)
+                plan[candidate][d] = 'S'
 
+            # Fill remaining blanks sensibly (prefer S if morning full)
             n_existing_N = count_shift_on_day(plan, d, 'N')
             n_existing_F = count_shift_on_day(plan, d, 'F')
             n_existing_S = count_shift_on_day(plan, d, 'S')
             remaining_blanks = [e for e in employees if plan[e][d] == '']
             for e in remaining_blanks:
+                # prefer assign F if morning still below target_morning (so counts can be 2-3)
                 if n_existing_F < target_morning:
                     plan[e][d] = 'F'
                     n_existing_F += 1
                 elif n_existing_S < target_second:
                     plan[e][d] = 'S'
                     n_existing_S += 1
-                elif n_existing_N < max_night_per_day and night_count_by_person.get(e,0) < max_nights_per_person and e != "Imran Khan":
-                    plan[e][d] = 'N'
-                    night_count_by_person[e] += 1
-                    n_existing_N += 1
                 else:
-                    plan[e][d] = 'S'
-                    n_existing_S += 1
+                    # fallback: try N if nights below max and person allowed
+                    if n_existing_N < max_night_per_day and night_count_by_person.get(e,0) < max_nights_per_person and e != "Imran Khan":
+                        plan[e][d] = 'N'
+                        night_count_by_person[e] = night_count_by_person.get(e,0) + 1
+                        n_existing_N += 1
+                    else:
+                        plan[e][d] = 'S'
+                        n_existing_S += 1
 
+        # --------------------------
+        # Step C: Final touches
+        # Ensure no blanks remain (set any remaining blank to S)
         for e in employees:
             for d in range(num_days):
                 if plan[e][d] == '':
                     plan[e][d] = 'S'
 
+        # Save to session
         df_plan = pd.DataFrame(plan, index=dates).T
         st.session_state['final_plan'] = df_plan
+
         st.success("Plan generated. Switch to 'Final Plan & Summary' tab to view and download.")
 
 # --------------------------
-# TAB 2 — Individual Leave
+# TAB 2: Individual Leave
 # --------------------------
 with tab2:
     st.header("Individual leave / ad-hoc adjustments")
@@ -286,7 +383,7 @@ with tab2:
             st.success(f"Applied individual leave for {emp} on {', '.join(day)}")
 
 # --------------------------
-# TAB 3 — Final Plan & Summary
+# TAB 3: Final Plan & Summary
 # --------------------------
 with tab3:
     st.header("Final Shift Plan and Summary")
@@ -295,6 +392,7 @@ with tab3:
     else:
         df_plan = st.session_state['final_plan']
 
+        # Coloring
         def color_map(val):
             cmap = {
                 'F': 'lightgreen','S':'lightblue','N':'lightpink',
@@ -303,6 +401,7 @@ with tab3:
             return f'background-color: {cmap.get(val,"")}'
         st.dataframe(df_plan.style.applymap(color_map), height=600)
 
+        # Summary counts
         summary = pd.DataFrame({
             'F': [sum(1 for v in df_plan.loc[e] if v=='F') for e in df_plan.index],
             'S': [sum(1 for v in df_plan.loc[e] if v=='S') for e in df_plan.index],
@@ -317,6 +416,7 @@ with tab3:
         st.subheader("Per-person shift counts this month")
         st.dataframe(summary)
 
+        # Daily coverage check: show counts per day for key shifts (F,S,N)
         daily_counts = pd.DataFrame({
             'Date': df_plan.columns,
             'F': [sum(1 for e in df_plan.index if df_plan.loc[e, col]=='F') for col in df_plan.columns],
@@ -327,8 +427,13 @@ with tab3:
         st.subheader("Daily coverage summary")
         st.dataframe(daily_counts)
 
+        # Download
         csv = df_plan.to_csv().encode('utf-8')
         st.download_button("Download CSV", csv, file_name=f"final_shift_plan_{year}_{month:02d}.csv")
 
-        st.info("Notes: Algorithm applies default coverage rules: "
-                "Max 2 on Night, 3 on Morning, 3 on Second, max 6 nights per person.")
+        st.info(
+            "Notes: - Coverage pool members (listed) are used to provide 24/7 coverage. "
+            "Night max = 2, Morning target = 3 (acceptable 2-3), Second target = 4 (acceptable 3-4). "
+            "Coverage pool follows a 5-on / 2-off cycle (respects explicit user weekoffs and festival days). "
+            "Other engineers' fixed/group shifts are unchanged."
+        )
