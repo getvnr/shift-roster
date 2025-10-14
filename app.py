@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from calendar import monthrange, weekday
+from calendar import monthrange
 
 st.set_page_config(layout="wide", page_title="24/7 Shift Planner")
 st.title("24/7 Shift Planner — Continuous Coverage")
@@ -16,11 +16,7 @@ employees = [
 # Tabs
 tab1, tab2, tab3 = st.tabs(["🗓️ Configure & Generate", "🙋 Individual Leave", "📊 Final Plan & Summary"])
 
-# Helpers
-def get_weekends(year, month):
-    return [d for d in range(1, monthrange(year, month)[1]+1) if weekday(year, month, d) in [5,6]]
-
-# TAB 1: Generate Roster
+# TAB 1: Configuration & Generate
 with tab1:
     st.header("Step 1 — Configure month & generate 24/7 roster")
     year = st.number_input("Year", 2023, 2100, 2025)
@@ -41,41 +37,48 @@ with tab1:
         night_count = {emp:0 for emp in employees}
         rng = np.random.default_rng(seed=(year*100+month))
 
-        # Weekends
-        weekends = get_weekends(year, month)
+        # Generate weekly offs per employee: 2 days off every 4-5 working days
+        weekly_off_days = {emp:[] for emp in employees}
+        for emp in employees:
+            day = 0
+            while day < num_days:
+                # pick 2 consecutive off days every 4–5 working days
+                start_off = min(day + rng.integers(4,6), num_days-1)
+                off_days = [start_off, min(start_off+1, num_days-1)]
+                weekly_off_days[emp].extend(off_days)
+                day = start_off + 2
 
-        # Initialize daily coverage counts
+        # Assign shifts
         for d_idx, date in enumerate(dates):
             assigned_N = 0
             assigned_F = 0
             assigned_S = 0
-            # assign shifts sequentially to ensure coverage
+
+            # Shuffle employees for fairness
             shuffled_emps = list(rng.permutation(employees))
             for emp in shuffled_emps:
-                # Skip if already assigned
                 if plan.loc[emp, date] != '':
                     continue
-                # Weekend
-                if d_idx+1 in weekends:
+                # Weekly off
+                if d_idx in weekly_off_days[emp]:
                     plan.loc[emp, date] = 'O'
+                # Festival
                 elif d_idx+1 in festival_days:
                     plan.loc[emp, date] = 'H'
                 else:
-                    # Assign Night if limit not reached
+                    # Assign Night if allowed
                     if assigned_N < max_night_per_day and night_count[emp] < max_night_per_person:
                         plan.loc[emp, date] = 'N'
                         night_count[emp] += 1
                         assigned_N +=1
-                    # Assign F if not reached
                     elif assigned_F < max_morning:
                         plan.loc[emp, date] = 'F'
                         assigned_F +=1
-                    # Assign S if not reached
                     elif assigned_S < max_second:
                         plan.loc[emp, date] = 'S'
                         assigned_S +=1
                     else:
-                        # extra assignment to ensure 24/7
+                        # Fill extra with S to maintain coverage
                         plan.loc[emp, date] = 'S'
 
         st.session_state['final_plan'] = plan
@@ -103,6 +106,7 @@ with tab3:
         st.warning("No plan available. Generate first.")
     else:
         df_plan = st.session_state['final_plan']
+
         def color_map(val):
             cmap = {'F':'lightgreen','S':'lightblue','N':'lightpink','O':'lightgray','H':'orange','L':'red'}
             return f'background-color: {cmap.get(val,"")}'
