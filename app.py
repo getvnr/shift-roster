@@ -5,7 +5,7 @@ from calendar import monthrange, weekday
 
 # --- Page Config ---
 st.set_page_config(layout="wide")
-st.title("Employee Leave & Shift Plan Generator (Equalized + Opposite Shifts)")
+st.title("Employee Leave & Shift Plan Generator (Persistent Opposite Shifts)")
 
 # --- Default Employees ---
 employee_data = pd.DataFrame([
@@ -145,39 +145,30 @@ def generate_leave_plan(target_offs=8):
 target_offs = st.slider("Target Off Days per Employee", min_value=6, max_value=12, value=8)
 roster_dict = generate_leave_plan(target_offs)
 
-# --- Opposite Shift Logic for Group1 ---
+# --- Persistent Opposite Shift Logic for Group1 ---
 group1 = ["Gopalakrishnan Selvaraj", "Paneerselvam F", "Rajesh Jayapalan"]
-shifts = ['F', 'S', 'N']
+shift_cycle = ['F', 'S', 'N']  # order for rotation
 shift_counts = {emp: {'F': 0, 'S': 0, 'N': 0} for emp in group1}
 
+# Assign initial opposite shifts
+current_shifts = dict(zip(group1, shift_cycle))
+
 for day in range(num_days):
-    # Skip if any has off/holiday that day
-    skip_day = any(roster_dict[emp][day] in ['O', 'H'] for emp in group1)
-    if skip_day:
+    # Check if all are off or holiday on this day
+    if all(roster_dict[emp][day] in ['O', 'H'] for emp in group1):
         continue
 
-    np.random.shuffle(shifts)
-    for emp, shift in zip(group1, shifts):
-        # Respect max limits
-        if shift == 'N' and shift_counts[emp]['N'] >= 10:
-            shift = np.random.choice(['F', 'S'])
-        elif shift == 'F' and shift_counts[emp]['F'] >= 10:
-            shift = np.random.choice(['S', 'N'])
-        elif shift == 'S' and shift_counts[emp]['S'] >= 10:
-            shift = np.random.choice(['F', 'N'])
+    # Apply current shifts to working days
+    for emp in group1:
+        if roster_dict[emp][day] not in ['O', 'H']:
+            roster_dict[emp][day] = current_shifts[emp]
+            shift_counts[emp][current_shifts[emp]] += 1
 
-        roster_dict[emp][day] = shift
-        shift_counts[emp][shift] += 1
-
-# Adjust if minimums not met
-for emp in group1:
-    for shift_type in ['F', 'S']:
-        while shift_counts[emp][shift_type] < 5:
-            for day in range(num_days):
-                if roster_dict[emp][day] == '':
-                    roster_dict[emp][day] = shift_type
-                    shift_counts[emp][shift_type] += 1
-                    break
+    # Detect if anyone has weekoff/holiday today → trigger next rotation for next working day
+    if any(roster_dict[emp][day] in ['O', 'H'] for emp in group1):
+        # Rotate shifts (F→S→N→F)
+        shift_cycle = shift_cycle[1:] + shift_cycle[:1]
+        current_shifts = dict(zip(group1, shift_cycle))
 
 # --- Convert to DataFrame ---
 df_roster = pd.DataFrame(roster_dict, index=dates).T
@@ -196,7 +187,7 @@ def color_leaves(val):
 st.subheader("Employee Leave & Shift Plan")
 st.dataframe(df_roster.style.applymap(color_leaves), height=600)
 
-# --- Leave Summary ---
+# --- Leave & Shift Summary ---
 st.subheader("Leave & Shift Summary")
 summary = pd.DataFrame({
     'Off Days (O)': [sum(1 for v in roster_dict[e] if v == 'O') for e in employees],
